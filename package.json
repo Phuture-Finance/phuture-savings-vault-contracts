@@ -1,6 +1,6 @@
 {
-  "name": "hardhat-foundry-template",
-  "version": "1.0.0",
+  "name": "@phuture/frp-contracts",
+  "version": "0.0.1",
   "description": "The harmony between Foundry and Hardhat.",
   "directories": {
     "lib": "lib",
