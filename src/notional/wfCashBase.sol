@@ -7,11 +7,11 @@ import "./lib/EncodeDecode.sol";
 import "./interfaces/INotionalV2.sol";
 import "./interfaces/IWrappedfCash.sol";
 import "../interfaces/IWETH9.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC777/ERC777Upgradeable.sol";
+import "openzeppelin-contracts/contracts/utils/Strings.sol";
+import "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "openzeppelin-contracts/contracts-upgradeable/token/ERC777/ERC777Upgradeable.sol";
 
 abstract contract wfCashBase is ERC777Upgradeable, IWrappedfCash {
     using SafeERC20 for IERC20;

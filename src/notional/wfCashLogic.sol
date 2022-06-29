@@ -3,7 +3,7 @@ pragma solidity >0.8.8;
 pragma experimental ABIEncoderV2;
 
 import "./wfCashBase.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 
 /// @dev This implementation contract is deployed as an UpgradeableBeacon. Each BeaconProxy
 /// that uses this contract as an implementation will call initialize to set its own fCash id.
