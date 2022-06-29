@@ -3,8 +3,8 @@ pragma solidity ^0.8.0;
 
 import {TokenType} from "../lib/Types.sol";
 import "./IERC4626.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC777/IERC777.sol";
+import "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import "openzeppelin-contracts/contracts/token/ERC777/IERC777.sol";
 
 interface IWrappedfCash {
     struct RedeemOpts {
