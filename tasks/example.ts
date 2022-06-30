@@ -68,10 +68,10 @@ async function main() {
     const gains = (await USDC.balanceOf(signer.address)).sub(lastBalance)
 
 
-    const conversionTx = await wrappedfCash.DEBUG_convertInternal(fCash, 3)
-    const conversionTxResult=  await conversionTx.wait()
+    
+  
 
-    console.log('conversionTxResult', conversionTxResult.gasUsed)
+  
     console.log('gains', deposited, gains)
     console.log('wrappedfCashAddress0', priceImpact)
     console.log('txResult.gasUsed', assetToken, txResult.gasUsed)

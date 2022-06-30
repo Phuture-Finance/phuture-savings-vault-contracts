@@ -3,7 +3,7 @@ pragma solidity >0.8.8;
 pragma experimental ABIEncoderV2;
 
 import "./wfCashBase.sol";
-import "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 /// @dev This implementation contract is deployed as an UpgradeableBeacon. Each BeaconProxy
 /// that uses this contract as an implementation will call initialize to set its own fCash id.
@@ -16,36 +16,6 @@ abstract contract wfCashLogic is wfCashBase, ReentrancyGuard {
     bytes4 internal constant ERC1155_BATCH_ACCEPTED = 0xbc197c81;
 
     constructor(INotionalV2 _notional, IWETH9 _weth) wfCashBase(_notional, _weth) {}
-
-    /***** Mint Methods *****/
-
-    /// @notice Lends deposit amount in return for fCashAmount using cTokens or aTokens
-    /// @param depositAmountExternal amount of cash to deposit into this method
-    /// @param fCashAmount amount of fCash to purchase (lend)
-    /// @param receiver address to receive the fCash shares
-    /// @param minImpliedRate minimum annualized interest rate to lend at
-    function mintViaAsset(
-        uint256 depositAmountExternal,
-        uint88 fCashAmount,
-        address receiver,
-        uint32 minImpliedRate
-    ) external override {
-        _mintInternal(depositAmountExternal, fCashAmount, receiver, minImpliedRate, false);
-    }
-
-    /// @notice Lends deposit amount in return for fCashAmount using underlying tokens
-    /// @param depositAmountExternal amount of cash to deposit into this method
-    /// @param fCashAmount amount of fCash to purchase (lend)
-    /// @param receiver address to receive the fCash shares
-    /// @param minImpliedRate minimum annualized interest rate to lend at
-    function mintViaUnderlying(
-        uint256 depositAmountExternal,
-        uint88 fCashAmount,
-        address receiver,
-        uint32 minImpliedRate
-    ) external override {
-        _mintInternal(depositAmountExternal, fCashAmount, receiver, minImpliedRate, true);
-    }
 
     function _mintInternal(
         uint256 depositAmountExternal,
@@ -159,42 +129,6 @@ abstract contract wfCashLogic is wfCashBase, ReentrancyGuard {
         bytes memory data = abi.encode(opts);
         // In this case, the owner is msg.sender based on the OZ ERC777 implementation
         burn(amount, data);
-    }
-
-    /// @notice Redeems tokens to asset tokens
-    /// @dev re-entrancy is protected on _burn
-    function redeemToAsset(
-        uint256 amount,
-        address receiver,
-        uint32 maxImpliedRate
-    ) external override {
-        redeem(
-            amount,
-            RedeemOpts({
-                redeemToUnderlying: false,
-                transferfCash: false,
-                receiver: receiver,
-                maxImpliedRate: maxImpliedRate
-            })
-        );
-    }
-
-    /// @notice Redeems tokens to underlying
-    /// @dev re-entrancy is protected on _burn
-    function redeemToUnderlying(
-        uint256 amount,
-        address receiver,
-        uint32 maxImpliedRate
-    ) external override {
-        redeem(
-            amount,
-            RedeemOpts({
-                redeemToUnderlying: true,
-                transferfCash: false,
-                receiver: receiver,
-                maxImpliedRate: maxImpliedRate
-            })
-        );
     }
 
     /// @notice Called before tokens are burned (redemption) and so we will handle

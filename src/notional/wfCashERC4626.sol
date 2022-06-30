@@ -51,12 +51,6 @@ contract wfCashERC4626 is IERC4626, wfCashLogic {
         return uint256(pvExternal);
     }
 
-    function DEBUG_convertInternal(uint256 fCashAmount, uint n) public  returns (uint256) {
-       for (uint i = 0; i < n; ++i) {
-            convertToAssets(fCashAmount);
-       }
-    }
-
     /** @dev See {IERC4626-totalAssets} */
     function totalAssets() public view override returns (uint256) {
         return hasMatured() ? _getMaturedValue() : _getPresentValue(totalSupply());
