@@ -4,8 +4,6 @@ import "@typechain/hardhat";
 import "hardhat-preprocessor";
 import { HardhatUserConfig, task } from "hardhat/config";
 
-import example from "./tasks/example";
-
 function getRemappings() {
   return fs
     .readFileSync("remappings.txt", "utf8")
@@ -14,7 +12,7 @@ function getRemappings() {
     .map((line) => line.trim().split("="));
 }
 
-task("example", "Example task").setAction(example);
+// task("example", "Example task").setAction(example);
 
 const config: HardhatUserConfig = {
   solidity: {
