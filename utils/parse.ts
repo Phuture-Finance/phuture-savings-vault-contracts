@@ -1,7 +1,7 @@
 'use strict'
 
-import { ethers } from 'hardhat'
 import { BigNumber, Wallet } from 'ethers'
+import { ethers } from 'hardhat'
 
 export function assertDefined<T>(property: string, obj: T): asserts obj is NonNullable<T> {
   if (obj === undefined || obj === null) {

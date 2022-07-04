@@ -3,12 +3,9 @@ pragma solidity >0.8.8;
 
 import "./AggregatorInterface.sol";
 
-
 interface NotionalGovernance {
-
     function updateAssetRate(uint16 currencyId, AssetRateAdapter rateOracle) external;
 }
-
 
 interface AssetRateAdapter {
     function token() external view returns (address);
@@ -27,7 +24,6 @@ interface AssetRateAdapter {
 
     function getAnnualizedSupplyRate() external view returns (uint256);
 }
-
 
 /// @notice Different types of internal tokens
 ///  - UnderlyingToken: underlying asset for a cToken (except for Ether)
@@ -492,7 +488,6 @@ struct AccountBalance {
     uint256 accountIncentiveDebt;
 }
 
-
 interface NotionalViews {
     function getMaxCurrencyId() external view returns (uint16);
 
@@ -541,25 +536,13 @@ interface NotionalViews {
 
     function getOwnershipStatus() external view returns (address owner, address pendingOwner);
 
-    function getGlobalTransferOperatorStatus(address operator)
-        external
-        view
-        returns (bool isAuthorized);
+    function getGlobalTransferOperatorStatus(address operator) external view returns (bool isAuthorized);
 
-    function getAuthorizedCallbackContractStatus(address callback)
-        external
-        view
-        returns (bool isAuthorized);
+    function getAuthorizedCallbackContractStatus(address callback) external view returns (bool isAuthorized);
 
-    function getSecondaryIncentiveRewarder(uint16 currencyId)
-        external
-        view
-        returns (address incentiveRewarder);
+    function getSecondaryIncentiveRewarder(uint16 currencyId) external view returns (address incentiveRewarder);
 
-    function getSettlementRate(uint16 currencyId, uint40 maturity)
-        external
-        view
-        returns (AssetRateParameters memory);
+    function getSettlementRate(uint16 currencyId, uint40 maturity) external view returns (AssetRateParameters memory);
 
     function getMarket(
         uint16 currencyId,

@@ -5,7 +5,6 @@ import "./Constants.sol";
 import "./Types.sol";
 
 library EncodeDecode {
-
     /// @notice Decodes asset ids
     function decodeERC1155Id(uint256 id)
         internal
@@ -34,8 +33,8 @@ library EncodeDecode {
         return
             uint256(
                 (bytes32(uint256(uint16(currencyId))) << 48) |
-                (bytes32(uint256(uint40(maturity))) << 8) |
-                bytes32(uint256(uint8(assetType)))
+                    (bytes32(uint256(uint40(maturity))) << 8) |
+                    bytes32(uint256(uint8(assetType)))
             );
     }
 
@@ -52,9 +51,9 @@ library EncodeDecode {
         action[0].trades = new bytes32[](1);
         action[0].trades[0] = bytes32(
             (uint256(uint8(TradeActionType.Lend)) << 248) |
-            (uint256(marketIndex) << 240) |
-            (uint256(fCashAmount) << 152) |
-            (uint256(minImpliedRate) << 120)
+                (uint256(marketIndex) << 240) |
+                (uint256(fCashAmount) << 152) |
+                (uint256(minImpliedRate) << 120)
         );
     }
 
@@ -74,9 +73,9 @@ library EncodeDecode {
         action[0].trades = new bytes32[](1);
         action[0].trades[0] = bytes32(
             (uint256(uint8(TradeActionType.Lend)) << 248) |
-            (uint256(marketIndex) << 240) |
-            (uint256(fCashAmount) << 152) |
-            (uint256(minImpliedRate) << 120)
+                (uint256(marketIndex) << 240) |
+                (uint256(fCashAmount) << 152) |
+                (uint256(minImpliedRate) << 120)
         );
     }
 
@@ -95,9 +94,9 @@ library EncodeDecode {
         action[0].trades = new bytes32[](1);
         action[0].trades[0] = bytes32(
             (uint256(uint8(TradeActionType.Borrow)) << 248) |
-            (uint256(marketIndex) << 240) |
-            (uint256(fCashAmount) << 152) |
-            (uint256(maxImpliedRate) << 120)
+                (uint256(marketIndex) << 240) |
+                (uint256(fCashAmount) << 152) |
+                (uint256(maxImpliedRate) << 120)
         );
     }
 }

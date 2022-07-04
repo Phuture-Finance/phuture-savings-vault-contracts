@@ -3,7 +3,7 @@ pragma solidity >0.8.8;
 pragma experimental ABIEncoderV2;
 
 import "./wfCashBase.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 
 /// @dev This implementation contract is deployed as an UpgradeableBeacon. Each BeaconProxy
 /// that uses this contract as an implementation will call initialize to set its own fCash id.
@@ -16,6 +16,20 @@ abstract contract wfCashLogic is wfCashBase, ReentrancyGuard {
     bytes4 internal constant ERC1155_BATCH_ACCEPTED = 0xbc197c81;
 
     constructor(INotionalV2 _notional, IWETH9 _weth) wfCashBase(_notional, _weth) {}
+
+    /// @notice Lends deposit amount in return for fCashAmount using underlying tokens
+    /// @param depositAmountExternal amount of cash to deposit into this method
+    /// @param fCashAmount amount of fCash to purchase (lend)
+    /// @param receiver address to receive the fCash shares
+    /// @param minImpliedRate minimum annualized interest rate to lend at
+    function mintViaUnderlying(
+        uint256 depositAmountExternal,
+        uint88 fCashAmount,
+        address receiver,
+        uint32 minImpliedRate
+    ) external override {
+        _mintInternal(depositAmountExternal, fCashAmount, receiver, minImpliedRate, true);
+    }
 
     function _mintInternal(
         uint256 depositAmountExternal,
@@ -48,7 +62,7 @@ abstract contract wfCashLogic is wfCashBase, ReentrancyGuard {
             );
             // Notional will return any residual ETH as the native token. When we _sendTokensToReceiver those
             // native ETH tokens will be wrapped back to WETH.
-            NotionalV2.batchBalanceAndTradeAction{value: depositAmountExternal}(address(this), action);
+            NotionalV2.batchBalanceAndTradeAction{ value: depositAmountExternal }(address(this), action);
         } else {
             // Transfers tokens in for lending, Notional will transfer from this contract.
             token.safeTransferFrom(msg.sender, address(this), depositAmountExternal);
@@ -85,10 +99,10 @@ abstract contract wfCashLogic is wfCashBase, ReentrancyGuard {
         // Only accept erc1155 transfers from NotionalV2
         require(
             msg.sender == address(NotionalV2) &&
-            // Only accept the fcash id that corresponds to the listed currency and maturity
-            _id == fCashID &&
-            // Protect against signed value underflows
-            int256(_value) > 0,
+                // Only accept the fcash id that corresponds to the listed currency and maturity
+                _id == fCashID &&
+                // Protect against signed value underflows
+                int256(_value) > 0,
             "Invalid"
         );
 
@@ -98,12 +112,8 @@ abstract contract wfCashLogic is wfCashBase, ReentrancyGuard {
         PortfolioAsset[] memory assets = NotionalV2.getAccountPortfolio(address(this));
         require(
             ac.hasDebt == 0x00 &&
-            assets.length == 1 &&
-            EncodeDecode.encodeERC1155Id(
-                assets[0].currencyId,
-                assets[0].maturity,
-                assets[0].assetType
-            ) == fCashID
+                assets.length == 1 &&
+                EncodeDecode.encodeERC1155Id(assets[0].currencyId, assets[0].maturity, assets[0].assetType) == fCashID
         );
 
         // Update per account fCash balance, calldata from the ERC1155 call is
@@ -131,6 +141,24 @@ abstract contract wfCashLogic is wfCashBase, ReentrancyGuard {
         burn(amount, data);
     }
 
+    /// @notice Redeems tokens to underlying
+    /// @dev re-entrancy is protected on _burn
+    function redeemToUnderlying(
+        uint256 amount,
+        address receiver,
+        uint32 maxImpliedRate
+    ) external override {
+        redeem(
+            amount,
+            RedeemOpts({
+                redeemToUnderlying: true,
+                transferfCash: false,
+                receiver: receiver,
+                maxImpliedRate: maxImpliedRate
+            })
+        );
+    }
+
     /// @notice Called before tokens are burned (redemption) and so we will handle
     /// the fCash properly before and after maturity.
     function _burn(
@@ -155,7 +183,11 @@ abstract contract wfCashLogic is wfCashBase, ReentrancyGuard {
             NotionalV2.settleAccount(address(this));
             uint16 currencyId = getCurrencyId();
 
-            (int256 cashBalance, /* */, /* */) = NotionalV2.getAccountBalance(currencyId, address(this));
+            (
+                int256 cashBalance, /* */ /* */
+                ,
+
+            ) = NotionalV2.getAccountBalance(currencyId, address(this));
             require(0 < cashBalance, "Negative Cash Balance");
 
             // This always rounds down in favor of the wrapped fCash contract.
@@ -170,7 +202,7 @@ abstract contract wfCashLogic is wfCashBase, ReentrancyGuard {
             );
         } else if (opts.transferfCash) {
             // If the fCash has not matured, then we can transfer it via ERC1155.
-            // NOTE: this may fail if the destination is a contract and it does not implement 
+            // NOTE: this may fail if the destination is a contract and it does not implement
             // the `onERC1155Received` hook. If that is the case it is possible to use a regular
             // ERC20 transfer on this contract instead.
             NotionalV2.safeTransferFrom(
@@ -181,12 +213,7 @@ abstract contract wfCashLogic is wfCashBase, ReentrancyGuard {
                 userData
             );
         } else {
-            _sellfCash(
-                opts.receiver,
-                amount,
-                opts.redeemToUnderlying,
-                opts.maxImpliedRate
-            );
+            _sellfCash(opts.receiver, amount, opts.redeemToUnderlying, opts.maxImpliedRate);
         }
     }
 
@@ -239,7 +266,7 @@ abstract contract wfCashLogic is wfCashBase, ReentrancyGuard {
         tokensTransferred = balanceAfter - balanceBefore;
 
         if (isETH) {
-            WETH.deposit{value: tokensTransferred}();
+            WETH.deposit{ value: tokensTransferred }();
             IERC20(address(WETH)).safeTransfer(receiver, tokensTransferred);
         } else {
             token.safeTransfer(receiver, tokensTransferred);

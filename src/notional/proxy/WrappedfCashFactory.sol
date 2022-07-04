@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >0.8.8;
 
-import "@openzeppelin/contracts/utils/Create2.sol";
+import "openzeppelin-contracts/contracts/utils/Create2.sol";
 import "./nBeaconProxy.sol";
 
 contract WrappedfCashFactory {
-
     /// @dev the Beacon contract here is an UpgradeableBeacon proxy, the contract
     /// at this address can be upgraded which will upgrade all deployed wrappers.
     address public immutable BEACON;
@@ -46,11 +45,12 @@ contract WrappedfCashFactory {
 
     function computeAddress(uint16 currencyId, uint40 maturity) public view returns (address) {
         address cachedAddress = _cachedWrapperAddress[currencyId][maturity];
-        
+
         // Returns the cached address in the case when the wrapper is already deployed, otherwise
         // compute the address which costs more gas.
-        return cachedAddress == address(0) ?
-            Create2.computeAddress(SALT, keccak256(_getByteCode(currencyId, maturity))) :
-            cachedAddress;
+        return
+            cachedAddress == address(0)
+                ? Create2.computeAddress(SALT, keccak256(_getByteCode(currencyId, maturity)))
+                : cachedAddress;
     }
 }

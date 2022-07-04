@@ -6,7 +6,11 @@ import "./Constants.sol";
 
 library DateTime {
     /// @notice Returns the current reference time which is how all the AMM dates are calculated.
-    function getReferenceTime(uint256 blockTime) internal pure returns (uint256) {
+    function getReferenceTime(uint256 blockTime)
+        internal
+        pure
+        returns (uint256)
+    {
         require(blockTime >= Constants.QUARTER);
         return blockTime - (blockTime % Constants.QUARTER);
     }
@@ -56,7 +60,10 @@ library DateTime {
         uint256 blockTime
     ) internal pure returns (uint256, bool) {
         require(maxMarketIndex > 0, "CG: no markets listed");
-        require(maxMarketIndex <= Constants.MAX_TRADED_MARKET_INDEX, "CG: market index bound");
+        require(
+            maxMarketIndex <= Constants.MAX_TRADED_MARKET_INDEX,
+            "CG: market index bound"
+        );
         uint256 tRef = DateTime.getReferenceTime(blockTime);
 
         for (uint256 i = 1; i <= maxMarketIndex; i++) {
@@ -73,7 +80,11 @@ library DateTime {
     /// @notice Given a bit number and the reference time of the first bit, returns the bit number
     /// of a given maturity.
     /// @return bitNum and a true or false if the maturity falls on the exact bit
-    function getBitNumFromMaturity(uint256 blockTime, uint256 maturity) internal pure returns (uint256, bool) {
+    function getBitNumFromMaturity(uint256 blockTime, uint256 maturity)
+        internal
+        pure
+        returns (uint256, bool)
+    {
         uint256 blockTimeUTC0 = getTimeUTC0(blockTime);
 
         // Maturities must always divide days evenly
@@ -100,7 +111,9 @@ library DateTime {
             return (
                 // This converts the offset in days to its corresponding bit position, truncating down
                 // if it does not divide evenly into DAYS_IN_WEEK
-                Constants.WEEK_BIT_OFFSET + offsetInDays / Constants.DAYS_IN_WEEK,
+                Constants.WEEK_BIT_OFFSET +
+                    offsetInDays /
+                    Constants.DAYS_IN_WEEK,
                 (offsetInDays % Constants.DAYS_IN_WEEK) == 0
             );
         } else if (daysOffset <= Constants.MAX_MONTH_OFFSET) {
@@ -110,7 +123,9 @@ library DateTime {
                 Constants.DAY;
 
             return (
-                Constants.MONTH_BIT_OFFSET + offsetInDays / Constants.DAYS_IN_MONTH,
+                Constants.MONTH_BIT_OFFSET +
+                    offsetInDays /
+                    Constants.DAYS_IN_MONTH,
                 (offsetInDays % Constants.DAYS_IN_MONTH) == 0
             );
         } else if (daysOffset <= Constants.MAX_QUARTER_OFFSET) {
@@ -120,7 +135,9 @@ library DateTime {
                 Constants.DAY;
 
             return (
-                Constants.QUARTER_BIT_OFFSET + offsetInDays / Constants.DAYS_IN_QUARTER,
+                Constants.QUARTER_BIT_OFFSET +
+                    offsetInDays /
+                    Constants.DAYS_IN_QUARTER,
                 (offsetInDays % Constants.DAYS_IN_QUARTER) == 0
             );
         }

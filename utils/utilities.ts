@@ -1,6 +1,5 @@
 'use strict'
 
-import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/dist/src/signer-with-address'
 import { BigNumber, BigNumberish, Contract, ContractTransaction } from 'ethers'
 import { solidityPack } from 'ethers/lib/utils'
 import { ethers } from 'hardhat'
@@ -81,45 +80,8 @@ function shouldRequestConfirmation(): boolean {
   return !skipConfirmation
 }
 
-export async function latestBlockTimestamp(provider: typeof ethers.provider): Promise<number> {
-  const latestBlockNumber = await provider.getBlockNumber()
-  const block = await provider.getBlock(latestBlockNumber)
-  return block.timestamp
-}
-
-export async function impersonate(provider: typeof ethers.provider, address: string): Promise<SignerWithAddress> {
-  await provider.send('hardhat_impersonateAccount', [address])
-  return SignerWithAddress.create(ethers.provider.getSigner(address))
-}
-
-export async function setBalance(
-  provider: typeof ethers.provider,
-  address: string,
-  amount: BigNumberish
-): Promise<void> {
-  await provider.send('hardhat_setBalance', [address, BigNumber.from(amount).toHexString()])
-}
-
-export async function mineBlocks(provider: typeof ethers.provider, count: number): Promise<void> {
-  for (let i = 1; i < count; i++) {
-    await provider.send('evm_mine', [])
-  }
-}
-
 export function getUnixTimestamp(date: Date): number {
   return Math.floor(date.getTime() / 1000)
-}
-
-export async function mineBlockAtTime(provider: typeof ethers.provider, timestamp: number): Promise<void> {
-  await provider.send('evm_mine', [timestamp])
-}
-
-export async function increaseTime(provider: typeof ethers.provider, timestamp: number): Promise<void> {
-  await provider.send('evm_increaseTime', [timestamp])
-}
-
-export async function setAutomine(provider: typeof ethers.provider, automine: boolean): Promise<void> {
-  await provider.send('evm_setAutomine', [automine])
 }
 
 export function formatJson(data: string): string {
