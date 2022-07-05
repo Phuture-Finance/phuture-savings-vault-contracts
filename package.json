@@ -8,6 +8,7 @@
   },
   "scripts": {
     "compile": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat compile",
+    "compile:test": "cross-env TEST=true hardhat compile",
     "test": "npm run compile:test && npm run mocha:run",
     "test:hardhat:fast": "NO_COMPILE=true TS_NODE_TRANSPILE_ONLY=1 npx hardhat test --network hardhat --no-compile",
     "remove-logs": "hardhat remove-logs",
