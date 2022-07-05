@@ -1,10 +1,13 @@
 import '@nomiclabs/hardhat-waffle'
 import '@typechain/hardhat'
 import 'dotenv/config'
+// eslint-disable-next-line unicorn/prefer-node-protocol
 import fs from 'fs'
 import 'hardhat-log-remover'
 import 'hardhat-preprocessor'
 import { HardhatUserConfig } from 'hardhat/config'
+
+/* eslint-disable unicorn/prefer-regexp-test */
 
 function getRemappings() {
   return fs
@@ -32,14 +35,14 @@ const config: HardhatUserConfig = {
   },
   // This fully resolves paths for imports in the ./lib directory for Hardhat
   preprocess: {
-    eachLine: hre => ({
+    eachLine: () => ({
       transform: (line: string) => {
         if (line.match(/^\s*import /i)) {
-          getRemappings().forEach(([find, replace]) => {
+          for (const [find, replace] of getRemappings()) {
             if (line.match(find)) {
               line = line.replace(find, replace)
             }
-          })
+          }
         }
         return line
       }

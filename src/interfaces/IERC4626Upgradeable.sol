@@ -5,6 +5,78 @@ import { IERC20Upgradeable } from "openzeppelin-contracts-upgradeable/contracts/
 import { IERC20MetadataUpgradeable } from "openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 
 interface IERC4626Upgradeable is IERC20Upgradeable, IERC20MetadataUpgradeable {
+    event Deposit(address indexed caller, address indexed owner, uint256 assets, uint256 shares);
+
+    event Withdraw(
+        address indexed caller,
+        address indexed receiver,
+        address indexed owner,
+        uint256 assets,
+        uint256 shares
+    );
+
+    /**
+     * @dev Mints shares Vault shares to receiver by depositing exactly amount of underlying tokens.
+     *
+     * - MUST emit the Deposit event.
+     * - MAY support an additional flow in which the underlying tokens are owned by the Vault contract before the
+     *   deposit execution, and are accounted for during deposit.
+     * - MUST revert if all of assets cannot be deposited (due to deposit limit being reached, slippage, the user not
+     *   approving enough underlying tokens to the Vault contract, etc).
+     *
+     * NOTE: most implementations will require pre-approval of the Vault with the Vault’s underlying asset token.
+     */
+    function deposit(uint256 assets, address receiver) external returns (uint256 shares);
+
+    /**
+     * @dev Mints exactly shares Vault shares to receiver by depositing amount of underlying tokens.
+     *
+     * - MUST emit the Deposit event.
+     * - MAY support an additional flow in which the underlying tokens are owned by the Vault contract before the mint
+     *   execution, and are accounted for during mint.
+     * - MUST revert if all of shares cannot be minted (due to deposit limit being reached, slippage, the user not
+     *   approving enough underlying tokens to the Vault contract, etc).
+     *
+     * NOTE: most implementations will require pre-approval of the Vault with the Vault’s underlying asset token.
+     */
+    function mint(uint256 shares, address receiver) external returns (uint256 assets);
+
+    /**
+     * @dev Burns shares from owner and sends exactly assets of underlying tokens to receiver.
+     *
+     * - MUST emit the Withdraw event.
+     * - MAY support an additional flow in which the underlying tokens are owned by the Vault contract before the
+     *   withdraw execution, and are accounted for during withdraw.
+     * - MUST revert if all of assets cannot be withdrawn (due to withdrawal limit being reached, slippage, the owner
+     *   not having enough shares, etc).
+     *
+     * Note that some implementations will require pre-requesting to the Vault before a withdrawal may be performed.
+     * Those methods should be performed separately.
+     */
+    function withdraw(
+        uint256 assets,
+        address receiver,
+        address owner
+    ) external returns (uint256 shares);
+
+    /**
+     * @dev Burns exactly shares from owner and sends assets of underlying tokens to receiver.
+     *
+     * - MUST emit the Withdraw event.
+     * - MAY support an additional flow in which the underlying tokens are owned by the Vault contract before the
+     *   redeem execution, and are accounted for during redeem.
+     * - MUST revert if all of shares cannot be redeemed (due to withdrawal limit being reached, slippage, the owner
+     *   not having enough shares, etc).
+     *
+     * NOTE: some implementations will require pre-requesting to the Vault before a withdrawal may be performed.
+     * Those methods should be performed separately.
+     */
+    function redeem(
+        uint256 shares,
+        address receiver,
+        address owner
+    ) external returns (uint256 assets);
+
     /**
      * @dev Returns the address of the underlying token used for the Vault for accounting, depositing, and withdrawing.
      *
@@ -80,19 +152,6 @@ interface IERC4626Upgradeable is IERC20Upgradeable, IERC20MetadataUpgradeable {
     function previewDeposit(uint256 assets) external view returns (uint256 shares);
 
     /**
-     * @dev Mints shares Vault shares to receiver by depositing exactly amount of underlying tokens.
-     *
-     * - MUST emit the Deposit event.
-     * - MAY support an additional flow in which the underlying tokens are owned by the Vault contract before the
-     *   deposit execution, and are accounted for during deposit.
-     * - MUST revert if all of assets cannot be deposited (due to deposit limit being reached, slippage, the user not
-     *   approving enough underlying tokens to the Vault contract, etc).
-     *
-     * NOTE: most implementations will require pre-approval of the Vault with the Vault’s underlying asset token.
-     */
-    function deposit(uint256 assets, address receiver) external returns (uint256 shares);
-
-    /**
      * @dev Returns the maximum amount of the Vault shares that can be minted for the receiver, through a mint call.
      * - MUST return a limited value if receiver is subject to some mint limit.
      * - MUST return 2 ** 256 - 1 if there is no limit on the maximum amount of shares that may be minted.
@@ -116,19 +175,6 @@ interface IERC4626Upgradeable is IERC20Upgradeable, IERC20MetadataUpgradeable {
      * share price or some other type of condition, meaning the depositor will lose assets by minting.
      */
     function previewMint(uint256 shares) external view returns (uint256 assets);
-
-    /**
-     * @dev Mints exactly shares Vault shares to receiver by depositing amount of underlying tokens.
-     *
-     * - MUST emit the Deposit event.
-     * - MAY support an additional flow in which the underlying tokens are owned by the Vault contract before the mint
-     *   execution, and are accounted for during mint.
-     * - MUST revert if all of shares cannot be minted (due to deposit limit being reached, slippage, the user not
-     *   approving enough underlying tokens to the Vault contract, etc).
-     *
-     * NOTE: most implementations will require pre-approval of the Vault with the Vault’s underlying asset token.
-     */
-    function mint(uint256 shares, address receiver) external returns (uint256 assets);
 
     /**
      * @dev Returns the maximum amount of the underlying asset that can be withdrawn from the owner balance in the
@@ -158,24 +204,6 @@ interface IERC4626Upgradeable is IERC20Upgradeable, IERC20MetadataUpgradeable {
     function previewWithdraw(uint256 assets) external view returns (uint256 shares);
 
     /**
-     * @dev Burns shares from owner and sends exactly assets of underlying tokens to receiver.
-     *
-     * - MUST emit the Withdraw event.
-     * - MAY support an additional flow in which the underlying tokens are owned by the Vault contract before the
-     *   withdraw execution, and are accounted for during withdraw.
-     * - MUST revert if all of assets cannot be withdrawn (due to withdrawal limit being reached, slippage, the owner
-     *   not having enough shares, etc).
-     *
-     * Note that some implementations will require pre-requesting to the Vault before a withdrawal may be performed.
-     * Those methods should be performed separately.
-     */
-    function withdraw(
-        uint256 assets,
-        address receiver,
-        address owner
-    ) external returns (uint256 shares);
-
-    /**
      * @dev Returns the maximum amount of Vault shares that can be redeemed from the owner balance in the Vault,
      * through a redeem call.
      *
@@ -201,32 +229,4 @@ interface IERC4626Upgradeable is IERC20Upgradeable, IERC20MetadataUpgradeable {
      * share price or some other type of condition, meaning the depositor will lose assets by redeeming.
      */
     function previewRedeem(uint256 shares) external view returns (uint256 assets);
-
-    /**
-     * @dev Burns exactly shares from owner and sends assets of underlying tokens to receiver.
-     *
-     * - MUST emit the Withdraw event.
-     * - MAY support an additional flow in which the underlying tokens are owned by the Vault contract before the
-     *   redeem execution, and are accounted for during redeem.
-     * - MUST revert if all of shares cannot be redeemed (due to withdrawal limit being reached, slippage, the owner
-     *   not having enough shares, etc).
-     *
-     * NOTE: some implementations will require pre-requesting to the Vault before a withdrawal may be performed.
-     * Those methods should be performed separately.
-     */
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address owner
-    ) external returns (uint256 assets);
-
-    event Deposit(address indexed caller, address indexed owner, uint256 assets, uint256 shares);
-
-    event Withdraw(
-        address indexed caller,
-        address indexed receiver,
-        address indexed owner,
-        uint256 assets,
-        uint256 shares
-    );
 }

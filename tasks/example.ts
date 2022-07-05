@@ -11,11 +11,11 @@ import {
   WrappedfCashFactory__factory
 } from '../typechain-types'
 import { impersonate, latestBlockTimestamp, setBalance } from '../utils/evm'
-import { expandTo18Decimals, expandTo6Decimals } from '../utils/utilities'
+import { expandTo18Decimals, expandTo6Decimals } from '../utils/helpers'
 
 async function main() {
   const signer = await impersonate(mainnetConfig.whales.USDC)
-  await setBalance(signer.address, expandTo18Decimals(1000000))
+  await setBalance(signer.address, expandTo18Decimals(1_000_000))
 
   const notionalRouter = NotionalViews__factory.connect(mainnetConfig.notional.router, signer)
   const notionalGovernance = NotionalGovernance__factory.connect(mainnetConfig.notional.router, signer)
@@ -24,7 +24,7 @@ async function main() {
   const notionalRouterOwnable = NUpgradeableBeacon__factory.connect(mainnetConfig.notional.router, signer)
   const ownerAddress = await notionalRouterOwnable.owner()
   const owner = await impersonate(ownerAddress)
-  await setBalance(owner.address, expandTo18Decimals(1000000))
+  await setBalance(owner.address, expandTo18Decimals(1_000_000))
 
   await notionalRouterOwnable.connect(owner).upgradeTo('0x16eD130F7A6dcAc7e3B0617A7bafa4b470189962')
   await notionalGovernance.connect(owner).updateAssetRate(1, '0x8E3D447eBE244db6D28E2303bCa86Ef3033CFAd6')
@@ -33,7 +33,7 @@ async function main() {
   await notionalGovernance.connect(owner).updateAssetRate(4, '0x39D9590721331B13C8e9A42941a2B961B513E69d')
 
   const USDC = IERC20__factory.connect(mainnetConfig.USDC, signer)
-  const USDCBalance = await USDC.balanceOf(signer.address)
+  // const USDCBalance = await USDC.balanceOf(signer.address)
 
   const WfCashERC4626Impl = await new WfCashERC4626__factory(signer).deploy(
     mainnetConfig.notional.router,
@@ -46,13 +46,13 @@ async function main() {
   await wrappedfCashFactory.deployWrapper(mainnetConfig.notional.currencyIdUSDC, maturity)
   const wrappedfCashAddress = await wrappedfCashFactory.computeAddress(mainnetConfig.notional.currencyIdUSDC, maturity)
   const wrappedfCash = await new WfCashERC4626__factory(signer).attach(wrappedfCashAddress)
-  const notional = await wrappedfCash.NotionalV2()
+  // const notional = await wrappedfCash.NotionalV2()
 
   await USDC.approve(wrappedfCash.address, ethers.constants.MaxUint256)
 
-  const deposited = expandTo6Decimals(100000)
+  const deposited = expandTo6Decimals(100_000)
   const blockTime = await latestBlockTimestamp()
-  const fCash = await wrappedfCash.convertToShares(deposited)
+  // const fCash = await wrappedfCash.convertToShares(deposited)
 
   const depositPreview = await notionalV2.getfCashLendFromDeposit(
     mainnetConfig.notional.currencyIdUSDC,
@@ -67,7 +67,7 @@ async function main() {
   const fCashFromDeposit = await wrappedfCash.balanceOf(signer.address)
   const assets = await wrappedfCash.convertToAssets(fCashFromDeposit)
 
-  const oracleRateDenom = 1000000000
+  const oracleRateDenom = 1_000_000_000
   const oracleValue = deposited.mul(oracleRate.add(oracleRateDenom)).div(oracleRateDenom)
 
   const priceImpact = assets.mul(100_000).div(deposited).toNumber() / 100_000
@@ -81,6 +81,7 @@ async function main() {
 
   const lastBalance = await USDC.balanceOf(signer.address)
   await wrappedfCash['redeem(uint256,address,address)'](fCashFromDeposit, signer.address, signer.address)
+  // eslint-disable-next-line unicorn/no-await-expression-member
   const gains = (await USDC.balanceOf(signer.address)).sub(lastBalance)
 
   console.log('gains', deposited, gains)
