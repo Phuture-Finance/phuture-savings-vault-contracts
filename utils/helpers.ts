@@ -1,7 +1,8 @@
-import { BigNumber, BigNumberish } from 'ethers'
+import { BigNumber, BigNumberish, ContractFactory } from 'ethers'
 import { parseUnits } from 'ethers/lib/utils'
 import { ethers } from 'hardhat'
 import { randomAddress as randomAddr } from 'hardhat/internal/hardhat-network/provider/fork/random'
+import { ERC1967Proxy__factory } from '../typechain-types'
 
 export const toUnit = (value: number): BigNumber => {
   return parseUnits(value.toString())
@@ -33,4 +34,18 @@ export const randomAddress: () => string = () => randomAddr().toString()
 
 export const toEther = (wei: BigNumber): string => {
   return ethers.utils.formatEther(wei)
+}
+
+export async function newProxyContract<T extends ContractFactory>(
+  factory: T,
+  values: Parameters<T['interface']['encodeFunctionData']>[1],
+  constructorArguments: Array<any> = []
+): Promise<ReturnType<T['attach']>> {
+  const impl = await factory.deploy(...constructorArguments)
+  const proxy = await new ERC1967Proxy__factory(factory.signer).deploy(
+    impl.address,
+    impl.interface.encodeFunctionData('initialize', values)
+  )
+
+  return impl.attach(proxy.address) as ReturnType<T['attach']>
 }

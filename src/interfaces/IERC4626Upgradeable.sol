@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity >0.8.8;
+pragma solidity 0.8.13;
 
-import { IERC20Upgradeable } from "openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
-import { IERC20MetadataUpgradeable } from "openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
+import { ERC20 } from "../ERC20.sol";
 
-interface IERC4626Upgradeable is IERC20Upgradeable, IERC20MetadataUpgradeable {
+interface IERC4626Upgradeable {
     event Deposit(address indexed caller, address indexed owner, uint256 assets, uint256 shares);
 
     event Withdraw(
@@ -83,7 +82,7 @@ interface IERC4626Upgradeable is IERC20Upgradeable, IERC20MetadataUpgradeable {
      * - MUST be an ERC-20 token contract.
      * - MUST NOT revert.
      */
-    function asset() external view returns (address assetTokenAddress);
+    function asset() external view returns (ERC20 assetTokenAddress);
 
     /**
      * @dev Returns the total amount of the underlying asset that is “managed” by Vault.

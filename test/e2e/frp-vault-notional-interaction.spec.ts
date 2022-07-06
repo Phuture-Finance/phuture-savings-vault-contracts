@@ -3,9 +3,9 @@ import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
 import * as mainnetConfig from '../../eth_mainnet.json'
-import { FRPVault, FRPVault__factory, IERC20, IERC20__factory, WrappedfCashFactory } from '../../typechain-types'
+import { FrpVault, FrpVault__factory, IERC20, IERC20__factory, WrappedfCashFactory } from '../../typechain-types'
 import { getStorageAt, impersonate, mineBlocks, reset, setBalance, snapshot } from '../../utils/evm'
-import { expandTo18Decimals, expandTo6Decimals } from '../../utils/helpers'
+import { expandTo18Decimals, expandTo6Decimals, newProxyContract } from '../../utils/helpers'
 import { deployWrappedfCashFactory, upgradeNotionalProxy } from '../../utils/notional-fixtures'
 import { VAULT_MANAGER_ROLE } from '../../utils/roles'
 
@@ -17,7 +17,7 @@ describe('FrpVault interaction with wrappedFCash [ @forked-mainnet]', function (
   let USDC: IERC20
 
   let wrappedFCashFactory: WrappedfCashFactory
-  let frpVault: FRPVault
+  let frpVault: FrpVault
 
   let snapshotId: string
 
@@ -37,15 +37,18 @@ describe('FrpVault interaction with wrappedFCash [ @forked-mainnet]', function (
 
     await upgradeNotionalProxy(signer)
     wrappedFCashFactory = await deployWrappedfCashFactory(signer)
-    frpVault = await new FRPVault__factory(signer).deploy(
-      mainnetConfig.USDC,
-      'USDC Notional Vault',
-      'USDC_VAULT',
-      mainnetConfig.notional.currencyIdUSDC,
-      wrappedFCashFactory.address,
-      mainnetConfig.notional.router,
-      200
+
+    frpVault = await newProxyContract(
+      new FrpVault__factory(signer),
+      ['USDC Notional Vault', 'USDC_VAULT', 200],
+      [
+        mainnetConfig.USDC,
+        mainnetConfig.notional.currencyIdUSDC,
+        wrappedFCashFactory.address,
+        mainnetConfig.notional.router
+      ]
     )
+
     await frpVault.grantRole(VAULT_MANAGER_ROLE, signer.address)
 
     await USDC.connect(usdcWhale).approve(frpVault.address, ethers.constants.MaxUint256)
@@ -57,6 +60,23 @@ describe('FrpVault interaction with wrappedFCash [ @forked-mainnet]', function (
   beforeEach(async function () {
     this.timeout(50_000)
     await snapshot.revert(snapshotId)
+  })
+
+  context('upgradeability', () => {
+    it('fails if trying to reinitialize frpVault', async () => {
+      await expect(frpVault.initialize('USDC Notional Vault', 'USDC_VAULT', 200)).to.be.revertedWith(
+        'Initializable: contract is already initialized'
+      )
+    })
+    it('upgrades to new implementation', async () => {
+      const newImpl = await new FrpVault__factory(signer).deploy(
+        mainnetConfig.USDC,
+        mainnetConfig.notional.currencyIdUSDC,
+        wrappedFCashFactory.address,
+        mainnetConfig.notional.router
+      )
+      await frpVault.upgradeTo(newImpl.address)
+    })
   })
 
   it('harvests deposited USDC', async () => {
@@ -123,7 +143,7 @@ describe('FrpVault interaction with wrappedFCash [ @forked-mainnet]', function (
     it('successfully', async () => {
       const newSlippage = 50
       await frpVault.connect(signer).setSlippage(newSlippage)
-      const actualSlippage = await getStorageAt(frpVault, 9)
+      const actualSlippage = await getStorageAt(frpVault, 353)
       await expect(BigNumber.from(actualSlippage)).to.eq(BigNumber.from(newSlippage))
     })
   })

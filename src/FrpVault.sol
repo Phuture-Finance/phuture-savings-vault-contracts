@@ -2,18 +2,25 @@
 
 pragma solidity 0.8.13;
 
-import { ERC4626 } from "solmate/mixins/ERC4626.sol";
-import { ERC20 } from "solmate/tokens/ERC20.sol";
+import "openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
+import "openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
+import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "openzeppelin-contracts-upgradeable/contracts/utils/introspection/ERC165CheckerUpgradeable.sol";
+import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/draft-IERC20PermitUpgradeable.sol";
+import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/IERC20Upgradeable.sol";
+
+import "./ERC20.sol";
+import "./ERC4626.sol";
 import { NotionalViews, MarketParameters } from "./notional/interfaces/INotional.sol";
-import { IWrappedfCashFactory } from "./notional/interfaces/IWrappedfCashFactory.sol";
+import "./notional/interfaces/IWrappedfCashFactory.sol";
 import { IWrappedfCashComplete } from "./notional/interfaces/IWrappedfCash.sol";
-import { Constants } from "./notional/lib/Constants.sol";
-import { EnumerableSet } from "openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
-import { AccessControl } from "openzeppelin-contracts/contracts/access/AccessControl.sol";
+import "./notional/lib/Constants.sol";
+import "./interfaces/IERC4626Upgradeable.sol";
 
 /// @title Fixed rate product vault
 /// @notice Contains logic for integration with Notional
-contract FRPVault is ERC4626, AccessControl {
+contract FrpVault is ERC4626, AccessControlUpgradeable, UUPSUpgradeable {
+    using ERC165CheckerUpgradeable for address;
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice Responsible for all vault related permissions
@@ -25,7 +32,7 @@ contract FRPVault is ERC4626, AccessControl {
     IWrappedfCashFactory public immutable wrappedfCashFactory;
     address public immutable notionalRouter;
 
-    EnumerableSet.AddressSet internal fCashPositions;
+    EnumerableSet.AddressSet internal fCashPositions; // This takes 2 slots
     uint16 internal slippage;
 
     /// @dev Emitted when minting new FCash during harvest
@@ -34,22 +41,29 @@ contract FRPVault is ERC4626, AccessControl {
     /// @param _fCashAmount      Amount of fCash minted
     event FCashMinted(IWrappedfCashComplete indexed _fCashPosition, uint _assetAmount, uint _fCashAmount);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor(
         ERC20 _asset,
-        string memory _name,
-        string memory _symbol,
         uint16 _currencyId,
         IWrappedfCashFactory _wrappedfCashFactory,
-        address _notionalRouter,
+        address _notionalRouter
+    ) ERC4626(_asset) initializer {
+        currencyId = _currencyId;
+        wrappedfCashFactory = _wrappedfCashFactory;
+        notionalRouter = _notionalRouter;
+    }
+
+    function initialize(
+        string memory _name,
+        string memory _symbol,
         uint16 _slippage
-    ) ERC4626(_asset, _name, _symbol) {
+    ) external initializer {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(VAULT_ADMIN_ROLE, msg.sender);
         _setRoleAdmin(VAULT_MANAGER_ROLE, VAULT_ADMIN_ROLE);
 
-        currencyId = _currencyId;
-        wrappedfCashFactory = _wrappedfCashFactory;
-        notionalRouter = _notionalRouter;
+        __AccessControl_init();
+        __ERC4626_init(_name, _symbol);
         slippage = _slippage;
     }
 
@@ -102,6 +116,14 @@ contract FRPVault is ERC4626, AccessControl {
         uint assets = _highestYieldWrappedfCash.convertToAssets(fCashAmount);
         require(100_000 - ((assets * 100_000) / _assetBalance) <= slippage, "FrpVault: PRICE_IMPACT");
     }
+
+    //    /// @inheritdoc ERC165Upgradeable
+    //    function supportsInterface(bytes4 _interfaceId) public view virtual override returns (bool) {
+    //        return _interfaceId == type(IERC4626Upgradeable).interfaceId ||
+    //        _interfaceId == type(IERC20Upgradeable).interfaceId ||
+    //        _interfaceId == type(IERC20PermitUpgradeable).interfaceId ||
+    //        super.supportsInterface(_interfaceId);
+    //    }
 
     /// @notice Loops through fCash positions and redeems into asset if position has matured
     function redeemAssetsIfMarketMatured() internal {
@@ -158,4 +180,11 @@ contract FRPVault is ERC4626, AccessControl {
             assert(highestYieldMaturity != 0);
         }
     }
+
+    /// @inheritdoc UUPSUpgradeable
+    function _authorizeUpgrade(address _newImpl) internal view virtual override {
+        require(hasRole(VAULT_ADMIN_ROLE, msg.sender), "FrpVault: FORBIDDEN");
+    }
+
+    uint256[47] private __gap;
 }
