@@ -98,7 +98,10 @@ contract FrpVault is ERC4626, AccessControlUpgradeable, UUPSUpgradeable {
         uint fCashPositionLength = fCashPositions.length();
         for (uint i = 0; i < fCashPositionLength; i++) {
             IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions.at(i));
-            assetBalance = assetBalance + fCashPosition.convertToAssets(fCashPosition.balanceOf(address(this)));
+            uint fCashBalance = fCashPosition.balanceOf(address(this));
+            if (fCashBalance != 0) {
+                assetBalance = assetBalance + fCashPosition.convertToAssets(fCashBalance);
+            }
         }
         return assetBalance;
     }
