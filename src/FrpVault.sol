@@ -117,14 +117,6 @@ contract FrpVault is ERC4626, AccessControlUpgradeable, UUPSUpgradeable {
         require(100_000 - ((assets * 100_000) / _assetBalance) <= slippage, "FrpVault: PRICE_IMPACT");
     }
 
-    //    /// @inheritdoc ERC165Upgradeable
-    //    function supportsInterface(bytes4 _interfaceId) public view virtual override returns (bool) {
-    //        return _interfaceId == type(IERC4626Upgradeable).interfaceId ||
-    //        _interfaceId == type(IERC20Upgradeable).interfaceId ||
-    //        _interfaceId == type(IERC20PermitUpgradeable).interfaceId ||
-    //        super.supportsInterface(_interfaceId);
-    //    }
-
     /// @notice Loops through fCash positions and redeems into asset if position has matured
     function redeemAssetsIfMarketMatured() internal {
         uint fCashPositionLength = fCashPositions.length();
