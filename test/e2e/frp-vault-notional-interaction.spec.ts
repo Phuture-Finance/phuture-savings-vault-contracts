@@ -38,16 +38,15 @@ describe('FrpVault interaction with wrappedFCash [ @forked-mainnet]', function (
     await upgradeNotionalProxy(signer)
     wrappedFCashFactory = await deployWrappedfCashFactory(signer)
 
-    frpVault = await newProxyContract(
-      new FrpVault__factory(signer),
-      ['USDC Notional Vault', 'USDC_VAULT', 200],
-      [
-        mainnetConfig.USDC,
-        mainnetConfig.notional.currencyIdUSDC,
-        wrappedFCashFactory.address,
-        mainnetConfig.notional.router
-      ]
-    )
+    frpVault = await newProxyContract(new FrpVault__factory(signer), [
+      'USDC Notional Vault',
+      'USDC_VAULT',
+      mainnetConfig.USDC,
+      mainnetConfig.notional.currencyIdUSDC,
+      wrappedFCashFactory.address,
+      mainnetConfig.notional.router,
+      200
+    ])
 
     await frpVault.grantRole(VAULT_MANAGER_ROLE, signer.address)
 
@@ -64,45 +63,49 @@ describe('FrpVault interaction with wrappedFCash [ @forked-mainnet]', function (
 
   context('upgradeability', () => {
     it('fails if trying to reinitialize frpVault', async () => {
-      await expect(frpVault.initialize('USDC Notional Vault', 'USDC_VAULT', 200)).to.be.revertedWith(
-        'Initializable: contract is already initialized'
-      )
+      await expect(
+        frpVault.initialize(
+          'USDC Notional Vault',
+          'USDC_VAULT',
+          mainnetConfig.USDC,
+          mainnetConfig.notional.currencyIdUSDC,
+          wrappedFCashFactory.address,
+          mainnetConfig.notional.router,
+          200
+        )
+      ).to.be.revertedWith('Initializable: contract is already initialized')
     })
     it('upgrades to new implementation', async () => {
-      const newImpl = await new FrpVault__factory(signer).deploy(
-        mainnetConfig.USDC,
-        mainnetConfig.notional.currencyIdUSDC,
-        wrappedFCashFactory.address,
-        mainnetConfig.notional.router
-      )
+      const newImpl = await new FrpVault__factory(signer).deploy()
       await frpVault.upgradeTo(newImpl.address)
     })
   })
 
-  it('harvests deposited USDC', async () => {
-    const amount = expandTo6Decimals(100)
+  it('harvest/withdrawal flow', async () => {
+    const amount = 100
+    const usdcAmount = expandTo6Decimals(amount)
     const allowedDeviationPercent = 1
 
     // usdcWhale deposits USDC
 
-    const shares = await frpVault.previewDeposit(amount)
-    await frpVault.connect(usdcWhale).deposit(amount, usdcWhale.address)
+    const shares = await frpVault.previewDeposit(usdcAmount)
+    await frpVault.connect(usdcWhale).deposit(usdcAmount, usdcWhale.address)
 
-    expect(amount).to.be.eq(shares)
-    expect(amount).to.be.eq(await frpVault.balanceOf(usdcWhale.address))
+    expect(expandTo18Decimals(amount)).to.be.eq(shares)
+    expect(expandTo18Decimals(amount)).to.be.eq(await frpVault.balanceOf(usdcWhale.address))
 
     // signer deposits usdc
-    await frpVault.deposit(amount, signer.address)
+    await frpVault.deposit(usdcAmount, signer.address)
 
-    expect(amount).to.be.eq(await frpVault.balanceOf(signer.address))
-    expect(await frpVault.totalAssets()).to.be.eq(amount.mul(2))
+    expect(expandTo18Decimals(amount)).to.be.eq(await frpVault.balanceOf(signer.address))
+    expect(await frpVault.totalAssets()).to.be.eq(usdcAmount.mul(2))
 
     await frpVault.harvest({ gasLimit: 30e6 })
     const usdcBalanceAfterHarvest = await frpVault.balanceOf(await frpVault.asset())
     await expect(usdcBalanceAfterHarvest).to.eq(0)
 
     // due to exchange losses shares are worth more
-    const sharesAfterHarvest = await frpVault.previewDeposit(amount, {
+    const sharesAfterHarvest = await frpVault.previewDeposit(usdcAmount, {
       gasLimit: 30e6
     })
     expect(sharesAfterHarvest.sub(shares)).to.be.gte(
@@ -125,9 +128,14 @@ describe('FrpVault interaction with wrappedFCash [ @forked-mainnet]', function (
     )
 
     // usdcWhale deposits more USDC
-    await frpVault.connect(usdcWhale).deposit(amount.mul(100), usdcWhale.address, { gasLimit: 30e6 })
+    await frpVault.connect(usdcWhale).deposit(usdcAmount.mul(1000), usdcWhale.address, { gasLimit: 30e6 })
 
     await frpVault.harvest({ gasLimit: 30e6 })
+
+    await frpVault.connect(usdcWhale).approve(frpVault.address, ethers.constants.MaxUint256)
+    await frpVault
+      .connect(usdcWhale)
+      .withdraw(usdcAmount.mul(500), usdcWhale.address, usdcWhale.address, { gasLimit: 30e6 })
   })
 
   it('fails on harvest with large amounts', async () => {
@@ -143,7 +151,7 @@ describe('FrpVault interaction with wrappedFCash [ @forked-mainnet]', function (
     it('successfully', async () => {
       const newSlippage = 50
       await frpVault.connect(signer).setSlippage(newSlippage)
-      const actualSlippage = await getStorageAt(frpVault, 353)
+      const actualSlippage = await getStorageAt(frpVault, 458)
       await expect(BigNumber.from(actualSlippage)).to.eq(BigNumber.from(newSlippage))
     })
   })

@@ -55,6 +55,10 @@ const config: HardhatUserConfig = {
         url: process.env.MAINNET_HTTPS_URL as string
       },
       blockGasLimit: 30_000_000
+    },
+    phuture: {
+      url: 'https://chain.dev.phuture.finance/',
+      timeout: 100_000_000
     }
   }
 }

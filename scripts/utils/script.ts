@@ -1,8 +1,8 @@
-import type { AccessControlUpgradeable } from '@types'
-import { parseBool } from '@utils/parser'
 import type { BytesLike, Contract, ContractFactory, ContractReceipt, Overrides } from 'ethers'
 import hre from 'hardhat'
 import yesno from 'yesno'
+import { AccessControlUpgradeable } from '../../typechain-types'
+import { parseBool } from '../../utils/parser'
 import * as logger from './logger'
 
 /**

@@ -1,5 +1,5 @@
-import { pipe } from '@utils/helpers'
 import chalk from 'chalk'
+import { pipe } from '../../utils/helpers'
 import { requestConfirmation, shouldRequestConfirmation } from './script'
 
 export const log = console.log
