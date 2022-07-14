@@ -1,1 +1,2 @@
 src/notional/**/*.sol
+src/test/**/*.sol
