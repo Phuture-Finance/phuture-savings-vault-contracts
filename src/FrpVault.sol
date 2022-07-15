@@ -31,8 +31,13 @@ contract FrpVault is ERC4626Upgradeable, ERC20PermitUpgradeable, AccessControlUp
     IWrappedfCashFactory public wrappedfCashFactory;
     address public notionalRouter;
 
-    EnumerableSet.AddressSet fCashPositions; // This takes 2 slots
+    EnumerableSet.AddressSet internal fCashPositions; // This takes 2 slots
     uint16 internal slippage;
+
+    struct NotionalMarket {
+        uint maturity;
+        uint oracleRate;
+    }
 
     /// @dev Emitted when minting new FCash during harvest
     /// @param _fCashPosition    Address of wrappedFCash token
@@ -68,7 +73,11 @@ contract FrpVault is ERC4626Upgradeable, ERC20PermitUpgradeable, AccessControlUp
         notionalRouter = _notionalRouter;
         slippage = _slippage;
 
-        (address lowestYieldFCash, address highestYieldFCash) = _getLowestHighestMaturity();
+        NotionalMarket[] memory threeAndSixMonthMarkets = _getThreeAndSixMonthMarkets();
+        (uint lowestYieldMaturity, uint highestYieldMaturity) = _sortMarketsByOracleRate(threeAndSixMonthMarkets);
+
+        address lowestYieldFCash = _wrappedfCashFactory.deployWrapper(_currencyId, uint40(lowestYieldMaturity));
+        address highestYieldFCash = _wrappedfCashFactory.deployWrapper(_currencyId, uint40(highestYieldMaturity));
         fCashPositions.add(lowestYieldFCash);
         fCashPositions.add(highestYieldFCash);
         IERC20Upgradeable(_asset).approve(highestYieldFCash, type(uint).max);
@@ -84,7 +93,13 @@ contract FrpVault is ERC4626Upgradeable, ERC20PermitUpgradeable, AccessControlUp
         if (assetBalance == 0) {
             return;
         }
-        (address lowestYieldFCash, address highestYieldFCash) = _getLowestHighestMaturity();
+        NotionalMarket[] memory threeAndSixMonthMarkets = _getThreeAndSixMonthMarkets();
+        (uint lowestYieldMaturity, uint highestYieldMaturity) = _sortMarketsByOracleRate(threeAndSixMonthMarkets);
+
+        IWrappedfCashFactory _wrappedfCashFactory = wrappedfCashFactory;
+        uint16 _currencyId = currencyId;
+        address lowestYieldFCash = _wrappedfCashFactory.deployWrapper(_currencyId, uint40(lowestYieldMaturity));
+        address highestYieldFCash = _wrappedfCashFactory.deployWrapper(_currencyId, uint40(highestYieldMaturity));
         _sortMaturities(lowestYieldFCash, highestYieldFCash, marketHasMatured);
 
         uint fCashAmount = _convertAssetsTofCash(assetBalance, IWrappedfCashComplete(highestYieldFCash));
@@ -263,37 +278,37 @@ contract FrpVault is ERC4626Upgradeable, ERC20PermitUpgradeable, AccessControlUp
         require(100_000 - ((_fCashAmount * 100_000) / fCashAmountOracle) <= maxSlippage, "FrpVault: PRICE_IMPACT");
     }
 
-    function _getLowestHighestMaturity() internal returns (address lowestYieldFCash, address highestYieldFCash) {
+    function _getThreeAndSixMonthMarkets() internal returns (NotionalMarket[] memory) {
+        NotionalMarket[] memory markets = new NotionalMarket[](2);
         MarketParameters[] memory marketParameters = NotionalViews(notionalRouter).getActiveMarkets(currencyId);
-        uint highestOracleRate;
-        uint highestYieldMaturity;
-        uint lowestYieldMaturity;
+        uint marketCount;
         for (uint i = 0; i < marketParameters.length; i++) {
             MarketParameters memory parameters = marketParameters[i];
             if (parameters.maturity >= block.timestamp + 2 * Constants.QUARTER) {
                 // it's not 3 or 6 months maturity check the next one
                 continue;
             }
-            // This sorting algorithm only works in case we are expecting to have two maturities reach this part of the code.
-            if (highestYieldMaturity == 0 && highestOracleRate == 0) {
-                highestYieldMaturity = parameters.maturity;
-                highestOracleRate = parameters.oracleRate;
-            } else {
-                // this is the second iteration now compare and set final values
-                if (highestOracleRate > parameters.oracleRate) {
-                    // initially set oracle rate is higher, just setup the lowestYieldMaturity
-                    lowestYieldMaturity = parameters.maturity;
-                } else {
-                    // swap the value for lowestYieldMaturity and set the highestYieldMaturity to be the current one
-                    lowestYieldMaturity = highestYieldMaturity;
-                    highestYieldMaturity = parameters.maturity;
-                }
-            }
+            markets[marketCount] = (
+                NotionalMarket({ maturity: parameters.maturity, oracleRate: parameters.oracleRate })
+            );
+            marketCount++;
         }
-        IWrappedfCashFactory _wrappedfCashFactory = wrappedfCashFactory;
-        uint16 _currencyId = currencyId;
-        highestYieldFCash = _wrappedfCashFactory.deployWrapper(_currencyId, uint40(highestYieldMaturity));
-        lowestYieldFCash = _wrappedfCashFactory.deployWrapper(_currencyId, uint40(lowestYieldMaturity));
+        return markets;
+    }
+
+    function _sortMarketsByOracleRate(NotionalMarket[] memory notionalMarkets)
+        internal
+        returns (uint lowestYieldMaturity, uint highestYieldMaturity)
+    {
+        uint market0OracleRate = notionalMarkets[0].oracleRate;
+        uint market1OracleRate = notionalMarkets[1].oracleRate;
+        if (market0OracleRate < market1OracleRate) {
+            lowestYieldMaturity = notionalMarkets[0].maturity;
+            highestYieldMaturity = notionalMarkets[1].maturity;
+        } else {
+            lowestYieldMaturity = notionalMarkets[1].maturity;
+            highestYieldMaturity = notionalMarkets[0].maturity;
+        }
     }
 
     function _sortMaturities(
