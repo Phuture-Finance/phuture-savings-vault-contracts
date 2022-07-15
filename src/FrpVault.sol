@@ -290,7 +290,6 @@ contract FrpVault is ERC4626Upgradeable, ERC20PermitUpgradeable, AccessControlUp
                 }
             }
         }
-        assert(highestYieldMaturity >= lowestYieldMaturity);
         IWrappedfCashFactory _wrappedfCashFactory = wrappedfCashFactory;
         uint16 _currencyId = currencyId;
         highestYieldFCash = _wrappedfCashFactory.deployWrapper(_currencyId, uint40(highestYieldMaturity));
