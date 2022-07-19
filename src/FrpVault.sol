@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.13;
 
-import "openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
 import "openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
@@ -10,17 +9,18 @@ import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/utils/SafeERC20
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/IERC20Upgradeable.sol";
+import "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 import { NotionalViews, MarketParameters } from "./notional/interfaces/INotional.sol";
 import "./notional/interfaces/IWrappedfCashFactory.sol";
 import { IWrappedfCashComplete } from "./notional/interfaces/IWrappedfCash.sol";
 import "./notional/lib/Constants.sol";
+import "./IFrpVault.sol";
 
 /// @title Fixed rate product vault
 /// @notice Contains logic for integration with Notional
-contract FrpVault is ERC4626Upgradeable, ERC20PermitUpgradeable, AccessControlUpgradeable, UUPSUpgradeable {
+contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, AccessControlUpgradeable, UUPSUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
-    using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice Responsible for all vault related permissions
     bytes32 internal constant VAULT_ADMIN_ROLE = keccak256("VAULT_ADMIN_ROLE");
@@ -31,25 +31,15 @@ contract FrpVault is ERC4626Upgradeable, ERC20PermitUpgradeable, AccessControlUp
     IWrappedfCashFactory public wrappedfCashFactory;
     address public notionalRouter;
 
-    EnumerableSet.AddressSet internal fCashPositions; // This takes 2 slots
-    uint16 internal slippage;
-
-    struct NotionalMarket {
-        uint maturity;
-        uint oracleRate;
-    }
-
-    /// @dev Emitted when minting new FCash during harvest
-    /// @param _fCashPosition    Address of wrappedFCash token
-    /// @param _assetAmount      Amount of asset
-    /// @param _fCashAmount      Amount of fCash minted
-    event FCashMinted(IWrappedfCashComplete indexed _fCashPosition, uint _assetAmount, uint _fCashAmount);
+    address[] internal fCashPositions;
+    uint16 internal maxLoss;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
+    /// @inheritdoc IFRPVault
     function initialize(
         string memory _name,
         string memory _symbol,
@@ -57,7 +47,7 @@ contract FrpVault is ERC4626Upgradeable, ERC20PermitUpgradeable, AccessControlUp
         uint16 _currencyId,
         IWrappedfCashFactory _wrappedfCashFactory,
         address _notionalRouter,
-        uint16 _slippage
+        uint16 _maxLoss
     ) external initializer {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(VAULT_ADMIN_ROLE, msg.sender);
@@ -71,104 +61,59 @@ contract FrpVault is ERC4626Upgradeable, ERC20PermitUpgradeable, AccessControlUp
         currencyId = _currencyId;
         wrappedfCashFactory = _wrappedfCashFactory;
         notionalRouter = _notionalRouter;
-        slippage = _slippage;
+        maxLoss = _maxLoss;
 
-        NotionalMarket[] memory threeAndSixMonthMarkets = _getThreeAndSixMonthMarkets();
-        (uint lowestYieldMaturity, uint highestYieldMaturity) = _sortMarketsByOracleRate(threeAndSixMonthMarkets);
+        (uint lowestYieldMaturity, uint highestYieldMaturity) = _sortMarketsByOracleRate();
 
         address lowestYieldFCash = _wrappedfCashFactory.deployWrapper(_currencyId, uint40(lowestYieldMaturity));
         address highestYieldFCash = _wrappedfCashFactory.deployWrapper(_currencyId, uint40(highestYieldMaturity));
-        fCashPositions.add(lowestYieldFCash);
-        fCashPositions.add(highestYieldFCash);
-        IERC20Upgradeable(_asset).approve(highestYieldFCash, type(uint).max);
-        IERC20Upgradeable(_asset).approve(lowestYieldFCash, type(uint).max);
+        fCashPositions = new address[](2);
+        fCashPositions[0] = lowestYieldFCash;
+        fCashPositions[1] = highestYieldFCash;
+        IERC20Upgradeable(_asset).safeApprove(highestYieldFCash, type(uint).max);
+        IERC20Upgradeable(_asset).safeApprove(lowestYieldFCash, type(uint).max);
     }
 
-    /// @notice Exchanges all the available assets into the highest yielding maturity
-    function harvest() external {
-        bool marketHasMatured = _redeemAssetsIfMarketMatured();
-        // either maxAsset or asset whichever is higher
+    /// @inheritdoc IFRPVault
+    function harvest(uint _maxDepositedAmount) external {
+        _redeemAssetsIfMarketMatured();
+
         address _asset = asset();
         uint assetBalance = IERC20Upgradeable(_asset).balanceOf(address(this));
         if (assetBalance == 0) {
             return;
         }
-        NotionalMarket[] memory threeAndSixMonthMarkets = _getThreeAndSixMonthMarkets();
-        (uint lowestYieldMaturity, uint highestYieldMaturity) = _sortMarketsByOracleRate(threeAndSixMonthMarkets);
+        uint deposited = Math.min(assetBalance, _maxDepositedAmount);
+
+        (uint lowestYieldMaturity, uint highestYieldMaturity) = _sortMarketsByOracleRate();
 
         IWrappedfCashFactory _wrappedfCashFactory = wrappedfCashFactory;
         uint16 _currencyId = currencyId;
         address lowestYieldFCash = _wrappedfCashFactory.deployWrapper(_currencyId, uint40(lowestYieldMaturity));
         address highestYieldFCash = _wrappedfCashFactory.deployWrapper(_currencyId, uint40(highestYieldMaturity));
-        _sortMaturities(lowestYieldFCash, highestYieldFCash, marketHasMatured);
+        _sortfCashPositions(lowestYieldFCash, highestYieldFCash);
 
-        uint fCashAmount = _convertAssetsTofCash(assetBalance, IWrappedfCashComplete(highestYieldFCash));
-        _safeApprove(_asset, highestYieldFCash, fCashAmount);
+        uint fCashAmount = _convertAssetsTofCash(deposited, IWrappedfCashComplete(highestYieldFCash));
+        _safeApprove(_asset, highestYieldFCash, deposited);
 
-        IWrappedfCashComplete(highestYieldFCash).mintViaUnderlying(assetBalance, uint88(fCashAmount), address(this), 0);
-        emit FCashMinted(IWrappedfCashComplete(highestYieldFCash), assetBalance, fCashAmount);
+        IWrappedfCashComplete(highestYieldFCash).mintViaUnderlying(deposited, uint88(fCashAmount), address(this), 0);
+        emit FCashMinted(IWrappedfCashComplete(highestYieldFCash), deposited, fCashAmount);
     }
 
-    /// @notice Sets slippage
-    /// @param _slippage slippage
-    function setSlippage(uint16 _slippage) external {
-        require(hasRole(VAULT_MANAGER_ROLE, msg.sender), "FrpVault: FORBIDDEN");
-        slippage = _slippage;
+    /// @inheritdoc IFRPVault
+    function setMaxLoss(uint16 _maxLoss) external {
+        require(hasRole(VAULT_MANAGER_ROLE, msg.sender), "FRPVault: FORBIDDEN");
+        maxLoss = _maxLoss;
     }
 
-    /// @notice Sets slippage
-    function withdraw(
-        uint assets,
-        address receiver,
-        address owner,
-        uint maxSlippage
-    ) external returns (uint) {
-        require(assets <= maxWithdraw(owner), "ERC4626: withdraw more than max");
-
-        uint256 shares = previewWithdraw(assets);
-        if (_msgSender() != owner) {
-            _spendAllowance(owner, _msgSender(), shares);
-        }
-        address asset = asset();
-        _beforeWithdraw(asset, assets, maxSlippage);
-        _burn(owner, shares);
-        SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(asset), receiver, assets);
-
-        emit Withdraw(_msgSender(), receiver, owner, assets, shares);
-
-        return shares;
-    }
-
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address owner,
-        uint maxSlippage
-    ) external returns (uint) {
-        require(shares <= maxRedeem(owner), "ERC4626: redeem more than max");
-
-        uint256 assets = previewRedeem(shares);
-        if (_msgSender() != owner) {
-            _spendAllowance(owner, _msgSender(), shares);
-        }
-        address asset = asset();
-        _beforeWithdraw(asset, assets, maxSlippage);
-        _burn(owner, shares);
-        SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(asset), receiver, assets);
-
-        emit Withdraw(_msgSender(), receiver, owner, assets, shares);
-
-        return assets;
-    }
-
+    /// @inheritdoc IERC4626Upgradeable
     function totalAssets() public view override returns (uint) {
         uint assetBalance = IERC20Upgradeable(asset()).balanceOf(address(this));
-        uint fCashPositionLength = fCashPositions.length();
-        for (uint i = 0; i < fCashPositionLength; i++) {
-            IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions.at(i));
+        for (uint i = 0; i < 2; i++) {
+            IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions[i]);
             uint fCashBalance = fCashPosition.balanceOf(address(this));
             if (fCashBalance != 0) {
-                assetBalance = assetBalance + fCashPosition.convertToAssets(fCashBalance);
+                assetBalance += fCashPosition.convertToAssets(fCashBalance);
             }
         }
         return assetBalance;
@@ -178,64 +123,43 @@ contract FrpVault is ERC4626Upgradeable, ERC20PermitUpgradeable, AccessControlUp
      * @dev Withdraw/redeem common workflow.
      */
     function _withdraw(
-        address caller,
-        address receiver,
-        address owner,
-        uint assets,
-        uint shares
+        address _caller,
+        address _receiver,
+        address _owner,
+        uint _assets,
+        uint _shares
     ) internal override {
-        // put super._withdraw()
-        if (caller != owner) {
-            _spendAllowance(owner, caller, shares);
-        }
-        address asset = asset();
-        _beforeWithdraw(asset, assets, slippage);
-        // If _asset is ERC777, `transfer` can trigger a reentrancy AFTER the transfer happens through the
-        // `tokensReceived` hook. On the other hand, the `tokensToSend` hook, that is triggered before the transfer,
-        // calls the vault, which is assumed not malicious.
-        //
-        // Conclusion: we need to do the transfer after the burn so that any reentrancy would happen after the
-        // shares are burned and after the assets are transfered, which is a valid state.
-        _burn(owner, shares);
-        SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(asset), receiver, assets);
-
-        emit Withdraw(caller, receiver, owner, assets, shares);
+        _beforeWithdraw(_assets);
+        super._withdraw(_caller, _receiver, _owner, _assets, _shares);
     }
 
     /// @notice Loops through fCash positions and redeems into asset if position has matured
-    function _redeemAssetsIfMarketMatured() internal returns (bool) {
-        // if market has matured returns true which means we need to cache the markets again.
-        bool marketHasMatured;
-        uint fCashPositionLength = fCashPositions.length();
+    function _redeemAssetsIfMarketMatured() internal {
+        uint fCashPositionLength = fCashPositions.length;
         for (uint i = 0; i < fCashPositionLength; i++) {
-            IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions.at(i));
+            IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions[i]);
             if (fCashPosition.hasMatured()) {
-                marketHasMatured = true;
                 uint fCashAmount = fCashPosition.balanceOf(address(this));
                 if (fCashAmount != 0) {
                     fCashPosition.redeemToUnderlying(fCashAmount, address(this), type(uint32).max);
                 }
             }
         }
-        return marketHasMatured;
     }
 
     /// @notice Withdraws asset from maturities
     /// @param _assets Amount of assets for withdrawal
-    function _beforeWithdraw(
-        address _asset,
-        uint _assets,
-        uint _maxSlippage
-    ) internal virtual {
-        if (IERC20Upgradeable(_asset).balanceOf(address(this)) < _assets) {
+    function _beforeWithdraw(uint _assets) internal virtual {
+        IERC20Upgradeable _asset = IERC20Upgradeable(asset());
+        if (_asset.balanceOf(address(this)) < _assets) {
             // first withdraw from the matured markets.
             _redeemAssetsIfMarketMatured();
-            uint assetBalance = IERC20Upgradeable(_asset).balanceOf(address(this));
+            uint assetBalance = _asset.balanceOf(address(this));
             if (assetBalance < _assets) {
-                uint amountNeeded = _assets + 1_000 - assetBalance;
-                uint fCashPositionLength = fCashPositions.length();
+                uint amountNeeded = _assets - assetBalance;
+                uint fCashPositionLength = fCashPositions.length;
                 for (uint i = 0; i < fCashPositionLength; i++) {
-                    IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions.at(i));
+                    IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions[i]);
 
                     uint fCashAmountNeeded = fCashPosition.previewWithdraw(amountNeeded);
                     uint fCashAmountAvailable = fCashPosition.balanceOf(address(this));
@@ -246,16 +170,9 @@ contract FrpVault is ERC4626Upgradeable, ERC20PermitUpgradeable, AccessControlUp
 
                     if (fCashAmountNeeded > fCashAmountAvailable) {
                         // there isn't enough assets in this position, withdraw all and move to the next maturity
-                        _checkPriceImpactDuringRedemption(
-                            fCashPosition.previewRedeem(fCashAmountAvailable),
-                            fCashAmountAvailable,
-                            fCashPosition,
-                            _maxSlippage
-                        );
                         fCashPosition.redeemToUnderlying(fCashAmountAvailable, address(this), type(uint32).max);
-                        amountNeeded = amountNeeded - IERC20Upgradeable(_asset).balanceOf(address(this));
+                        amountNeeded = amountNeeded - _asset.balanceOf(address(this));
                     } else {
-                        _checkPriceImpactDuringRedemption(amountNeeded, fCashAmountNeeded, fCashPosition, _maxSlippage);
                         fCashPosition.redeemToUnderlying(fCashAmountNeeded, address(this), type(uint32).max);
                         break;
                     }
@@ -264,20 +181,7 @@ contract FrpVault is ERC4626Upgradeable, ERC20PermitUpgradeable, AccessControlUp
         }
     }
 
-    /// @notice Checks for price impact during redemption.
-    /// @param _assetAmount Amount of asset
-    /// @param _fCashAmount Spot amount of fCash
-    /// @param _fCashPosition Address of the wrappedfCash
-    function _checkPriceImpactDuringRedemption(
-        uint _assetAmount,
-        uint _fCashAmount,
-        IWrappedfCashComplete _fCashPosition,
-        uint maxSlippage
-    ) internal view {
-        uint fCashAmountOracle = _fCashPosition.convertToShares(_assetAmount);
-        require(100_000 - ((_fCashAmount * 100_000) / fCashAmountOracle) <= maxSlippage, "FrpVault: PRICE_IMPACT");
-    }
-
+    /// @notice Gets the three and six months markets from Notional
     function _getThreeAndSixMonthMarkets() internal returns (NotionalMarket[] memory) {
         NotionalMarket[] memory markets = new NotionalMarket[](2);
         MarketParameters[] memory marketParameters = NotionalViews(notionalRouter).getActiveMarkets(currencyId);
@@ -293,13 +197,13 @@ contract FrpVault is ERC4626Upgradeable, ERC20PermitUpgradeable, AccessControlUp
             );
             marketCount++;
         }
+        require(marketCount == 2, "FRPVault: NOTIONAL_MARKETS");
         return markets;
     }
 
-    function _sortMarketsByOracleRate(NotionalMarket[] memory notionalMarkets)
-        internal
-        returns (uint lowestYieldMaturity, uint highestYieldMaturity)
-    {
+    /// @notice Sorts the markets in ascending order by their oracle rate
+    function _sortMarketsByOracleRate() internal returns (uint lowestYieldMaturity, uint highestYieldMaturity) {
+        NotionalMarket[] memory notionalMarkets = _getThreeAndSixMonthMarkets();
         uint market0OracleRate = notionalMarkets[0].oracleRate;
         uint market1OracleRate = notionalMarkets[1].oracleRate;
         if (market0OracleRate < market1OracleRate) {
@@ -311,23 +215,19 @@ contract FrpVault is ERC4626Upgradeable, ERC20PermitUpgradeable, AccessControlUp
         }
     }
 
-    function _sortMaturities(
-        address lowestYieldFCash,
-        address highestYieldFCash,
-        bool _marketHasMatured
-    ) internal {
-        address first = fCashPositions.at(0);
-        if (_marketHasMatured || first != lowestYieldFCash) {
-            address second = fCashPositions.at(1);
-            fCashPositions.remove(first);
-            fCashPositions.remove(second);
-            fCashPositions.add(lowestYieldFCash);
-            fCashPositions.add(highestYieldFCash);
+    /// @notice Sorts fCash positions in case there was a change with respect to the previous state
+    function _sortfCashPositions(address _lowestYieldFCash, address _highestYieldFCash) internal {
+        if (
+            keccak256(abi.encodePacked(fCashPositions[0], fCashPositions[1])) !=
+            keccak256(abi.encodePacked(_lowestYieldFCash, _highestYieldFCash))
+        ) {
+            fCashPositions[0] = _lowestYieldFCash;
+            fCashPositions[1] = _highestYieldFCash;
         }
     }
 
     /// @notice Approves the `_spender` to spend `_requiredAllowance` of `_token`
-    /// @param _token Token address
+    /// @param _token Token address_msg
     /// @param _spender Spender address
     /// @param _requiredAllowance Required allowance
     function _safeApprove(
@@ -352,13 +252,13 @@ contract FrpVault is ERC4626Upgradeable, ERC20PermitUpgradeable, AccessControlUp
     {
         fCashAmount = _highestYieldWrappedfCash.previewDeposit(_assetBalance);
         uint fCashAmountOracle = _highestYieldWrappedfCash.convertToShares(_assetBalance);
-        require(100_000 - ((fCashAmount * 100_000) / fCashAmountOracle) <= slippage, "FrpVault: PRICE_IMPACT");
+        require(fCashAmount >= (fCashAmountOracle * maxLoss) / 10_000, "FRPVault: PRICE_IMPACT");
     }
 
     /// @inheritdoc UUPSUpgradeable
     function _authorizeUpgrade(address _newImpl) internal view virtual override {
-        require(hasRole(VAULT_ADMIN_ROLE, msg.sender), "FrpVault: FORBIDDEN");
+        require(hasRole(VAULT_ADMIN_ROLE, msg.sender), "FRPVault: FORBIDDEN");
     }
 
-    uint256[44] private __gap;
+    uint256[45] private __gap;
 }
