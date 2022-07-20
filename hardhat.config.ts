@@ -7,6 +7,8 @@ import 'hardhat-log-remover'
 import 'hardhat-preprocessor'
 import { HardhatUserConfig } from 'hardhat/config'
 
+import { accounts } from './utils/accounts'
+
 /* eslint-disable unicorn/prefer-regexp-test */
 
 function getRemappings() {
@@ -50,14 +52,15 @@ const config: HardhatUserConfig = {
   },
   networks: {
     hardhat: {
+      accounts,
       forking: {
         enabled: !!process.env.FORK,
         url: process.env.MAINNET_HTTPS_URL as string
       },
       blockGasLimit: 30_000_000
     },
-    phuture: {
-      url: 'https://chain.dev.phuture.finance/',
+    frp: {
+      url: 'https://chain.frp.phuture.finance/',
       timeout: 100_000_000
     }
   }

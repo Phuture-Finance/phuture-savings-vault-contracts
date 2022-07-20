@@ -15,7 +15,7 @@ import { NotionalViews, MarketParameters } from "./notional/interfaces/INotional
 import "./notional/interfaces/IWrappedfCashFactory.sol";
 import { IWrappedfCashComplete } from "./notional/interfaces/IWrappedfCash.sol";
 import "./notional/lib/Constants.sol";
-import "./IFrpVault.sol";
+import "./IFRPVault.sol";
 
 /// @title Fixed rate product vault
 /// @notice Contains logic for integration with Notional
@@ -26,6 +26,10 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
     bytes32 internal constant VAULT_ADMIN_ROLE = keccak256("VAULT_ADMIN_ROLE");
     /// @notice Role for vault
     bytes32 internal constant VAULT_MANAGER_ROLE = keccak256("VAULT_MANAGER_ROLE");
+    /// @notice Number of supported maturities
+    uint8 internal constant SUPPORTED_MATURITIES = 2;
+    /// @notice Base point number
+    uint16 constant BP = 10_000;
 
     uint16 public currencyId;
     IWrappedfCashFactory public wrappedfCashFactory;
@@ -33,6 +37,11 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
 
     address[] internal fCashPositions;
     uint16 internal maxLoss;
+
+    modifier isVaildMaxLoss(uint16 _maxLoss) {
+        require(maxLoss <= BP, "FRPVault: MAX_LOSS");
+        _;
+    }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -48,7 +57,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
         IWrappedfCashFactory _wrappedfCashFactory,
         address _notionalRouter,
         uint16 _maxLoss
-    ) external initializer {
+    ) external initializer isVaildMaxLoss(_maxLoss) {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(VAULT_ADMIN_ROLE, msg.sender);
         _setRoleAdmin(VAULT_MANAGER_ROLE, VAULT_ADMIN_ROLE);
@@ -67,7 +76,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
 
         address lowestYieldFCash = _wrappedfCashFactory.deployWrapper(_currencyId, uint40(lowestYieldMaturity));
         address highestYieldFCash = _wrappedfCashFactory.deployWrapper(_currencyId, uint40(highestYieldMaturity));
-        fCashPositions = new address[](2);
+        fCashPositions = new address[](SUPPORTED_MATURITIES);
         fCashPositions[0] = lowestYieldFCash;
         fCashPositions[1] = highestYieldFCash;
         IERC20Upgradeable(_asset).safeApprove(highestYieldFCash, type(uint).max);
@@ -101,7 +110,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
     }
 
     /// @inheritdoc IFRPVault
-    function setMaxLoss(uint16 _maxLoss) external {
+    function setMaxLoss(uint16 _maxLoss) external isVaildMaxLoss(_maxLoss) {
         require(hasRole(VAULT_MANAGER_ROLE, msg.sender), "FRPVault: FORBIDDEN");
         maxLoss = _maxLoss;
     }
@@ -109,7 +118,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
     /// @inheritdoc IERC4626Upgradeable
     function totalAssets() public view override returns (uint) {
         uint assetBalance = IERC20Upgradeable(asset()).balanceOf(address(this));
-        for (uint i = 0; i < 2; i++) {
+        for (uint i = 0; i < SUPPORTED_MATURITIES; i++) {
             IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions[i]);
             uint fCashBalance = fCashPosition.balanceOf(address(this));
             if (fCashBalance != 0) {
@@ -150,55 +159,29 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
     /// @notice Withdraws asset from maturities
     /// @param _assets Amount of assets for withdrawal
     function _beforeWithdraw(uint _assets) internal virtual {
-        IERC20Upgradeable _asset = IERC20Upgradeable(asset());
-        if (_asset.balanceOf(address(this)) < _assets) {
-            // first withdraw from the matured markets.
-            _redeemAssetsIfMarketMatured();
-            uint assetBalance = _asset.balanceOf(address(this));
-            if (assetBalance < _assets) {
-                uint amountNeeded = _assets - assetBalance;
-                uint fCashPositionLength = fCashPositions.length;
-                for (uint i = 0; i < fCashPositionLength; i++) {
-                    IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions[i]);
+        IERC20MetadataUpgradeable _asset = IERC20MetadataUpgradeable(asset());
+        uint assetBalance = _asset.balanceOf(address(this));
+        if (assetBalance < _assets) {
+            uint amountNeeded = _assets + (10**_asset.decimals() / 10**3) - assetBalance;
+            uint fCashPositionLength = fCashPositions.length;
+            for (uint i = 0; i < fCashPositionLength; i++) {
+                IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions[i]);
+                uint fCashAmountAvailable = fCashPosition.balanceOf(address(this));
+                if (fCashAmountAvailable == 0) {
+                    continue;
+                }
+                uint fCashAmountNeeded = fCashPosition.previewWithdraw(amountNeeded);
 
-                    uint fCashAmountNeeded = fCashPosition.previewWithdraw(amountNeeded);
-                    uint fCashAmountAvailable = fCashPosition.balanceOf(address(this));
-
-                    if (fCashAmountAvailable == 0) {
-                        continue;
-                    }
-
-                    if (fCashAmountNeeded > fCashAmountAvailable) {
-                        // there isn't enough assets in this position, withdraw all and move to the next maturity
-                        fCashPosition.redeemToUnderlying(fCashAmountAvailable, address(this), type(uint32).max);
-                        amountNeeded = amountNeeded - _asset.balanceOf(address(this));
-                    } else {
-                        fCashPosition.redeemToUnderlying(fCashAmountNeeded, address(this), type(uint32).max);
-                        break;
-                    }
+                if (fCashAmountNeeded > fCashAmountAvailable) {
+                    // there isn't enough assets in this position, withdraw all and move to the next maturity
+                    fCashPosition.redeemToUnderlying(fCashAmountAvailable, address(this), type(uint32).max);
+                    amountNeeded -= _asset.balanceOf(address(this));
+                } else {
+                    fCashPosition.redeemToUnderlying(fCashAmountNeeded, address(this), type(uint32).max);
+                    break;
                 }
             }
         }
-    }
-
-    /// @notice Gets the three and six months markets from Notional
-    function _getThreeAndSixMonthMarkets() internal returns (NotionalMarket[] memory) {
-        NotionalMarket[] memory markets = new NotionalMarket[](2);
-        MarketParameters[] memory marketParameters = NotionalViews(notionalRouter).getActiveMarkets(currencyId);
-        uint marketCount;
-        for (uint i = 0; i < marketParameters.length; i++) {
-            MarketParameters memory parameters = marketParameters[i];
-            if (parameters.maturity >= block.timestamp + 2 * Constants.QUARTER) {
-                // it's not 3 or 6 months maturity check the next one
-                continue;
-            }
-            markets[marketCount] = (
-                NotionalMarket({ maturity: parameters.maturity, oracleRate: parameters.oracleRate })
-            );
-            marketCount++;
-        }
-        require(marketCount == 2, "FRPVault: NOTIONAL_MARKETS");
-        return markets;
     }
 
     /// @notice Sorts the markets in ascending order by their oracle rate
@@ -241,6 +224,26 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
         }
     }
 
+    /// @notice Gets the three and six months markets from Notional
+    function _getThreeAndSixMonthMarkets() internal view returns (NotionalMarket[] memory) {
+        NotionalMarket[] memory markets = new NotionalMarket[](SUPPORTED_MATURITIES);
+        MarketParameters[] memory marketParameters = NotionalViews(notionalRouter).getActiveMarkets(currencyId);
+        uint marketCount;
+        for (uint i = 0; i < marketParameters.length; i++) {
+            MarketParameters memory parameters = marketParameters[i];
+            if (parameters.maturity >= block.timestamp + 2 * Constants.QUARTER) {
+                // it's not 3 or 6 months maturity check the next one
+                continue;
+            }
+            markets[marketCount] = (
+                NotionalMarket({ maturity: parameters.maturity, oracleRate: parameters.oracleRate })
+            );
+            marketCount++;
+        }
+        require(marketCount == SUPPORTED_MATURITIES, "FRPVault: NOTIONAL_MARKETS");
+        return markets;
+    }
+
     /// @notice Converts assets to fCash amount
     /// @param _assetBalance Amount of asset
     /// @param _highestYieldWrappedfCash Address of the wrappedfCash
@@ -252,7 +255,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
     {
         fCashAmount = _highestYieldWrappedfCash.previewDeposit(_assetBalance);
         uint fCashAmountOracle = _highestYieldWrappedfCash.convertToShares(_assetBalance);
-        require(fCashAmount >= (fCashAmountOracle * maxLoss) / 10_000, "FRPVault: PRICE_IMPACT");
+        require(fCashAmount >= (fCashAmountOracle * maxLoss) / BP, "FRPVault: PRICE_IMPACT");
     }
 
     /// @inheritdoc UUPSUpgradeable

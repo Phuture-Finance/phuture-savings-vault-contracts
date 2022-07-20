@@ -1,3 +1,4 @@
+export * as accounts from './accounts'
 export * as evm from './evm'
 export * as helpers from './helpers'
 export * as notionalFixtures from './notional-fixtures'
