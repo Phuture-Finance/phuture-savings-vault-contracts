@@ -184,20 +184,6 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
         }
     }
 
-    /// @notice Sorts the markets in ascending order by their oracle rate
-    function _sortMarketsByOracleRate() internal returns (uint lowestYieldMaturity, uint highestYieldMaturity) {
-        NotionalMarket[] memory notionalMarkets = _getThreeAndSixMonthMarkets();
-        uint market0OracleRate = notionalMarkets[0].oracleRate;
-        uint market1OracleRate = notionalMarkets[1].oracleRate;
-        if (market0OracleRate < market1OracleRate) {
-            lowestYieldMaturity = notionalMarkets[0].maturity;
-            highestYieldMaturity = notionalMarkets[1].maturity;
-        } else {
-            lowestYieldMaturity = notionalMarkets[1].maturity;
-            highestYieldMaturity = notionalMarkets[0].maturity;
-        }
-    }
-
     /// @notice Sorts fCash positions in case there was a change with respect to the previous state
     function _sortfCashPositions(address _lowestYieldFCash, address _highestYieldFCash) internal {
         if (
@@ -242,6 +228,20 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
         }
         require(marketCount == SUPPORTED_MATURITIES, "FRPVault: NOTIONAL_MARKETS");
         return markets;
+    }
+
+    /// @notice Sorts the markets in ascending order by their oracle rate
+    function _sortMarketsByOracleRate() internal view returns (uint lowestYieldMaturity, uint highestYieldMaturity) {
+        NotionalMarket[] memory notionalMarkets = _getThreeAndSixMonthMarkets();
+        uint market0OracleRate = notionalMarkets[0].oracleRate;
+        uint market1OracleRate = notionalMarkets[1].oracleRate;
+        if (market0OracleRate < market1OracleRate) {
+            lowestYieldMaturity = notionalMarkets[0].maturity;
+            highestYieldMaturity = notionalMarkets[1].maturity;
+        } else {
+            lowestYieldMaturity = notionalMarkets[1].maturity;
+            highestYieldMaturity = notionalMarkets[0].maturity;
+        }
     }
 
     /// @notice Converts assets to fCash amount
