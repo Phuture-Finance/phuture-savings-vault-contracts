@@ -29,7 +29,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
     /// @notice Number of supported maturities
     uint8 internal constant SUPPORTED_MATURITIES = 2;
     /// @notice Base point number
-    uint16 constant BP = 10_000;
+    uint16 internal constant BP = 10_000;
 
     uint16 public currencyId;
     IWrappedfCashFactory public wrappedfCashFactory;
