@@ -27,6 +27,7 @@ interface IFRPVault {
     /// @param _wrappedfCashFactory Address of the deployed fCashFactory
     /// @param _notionalRouter Address of the deployed notional router
     /// @param _maxLoss Maximum loss allowed
+    /// @param _feeRecipient Address of the feeRecipient
     function initialize(
         string memory _name,
         string memory _symbol,
@@ -34,7 +35,8 @@ interface IFRPVault {
         uint16 _currencyId,
         IWrappedfCashFactory _wrappedfCashFactory,
         address _notionalRouter,
-        uint16 _maxLoss
+        uint16 _maxLoss,
+        address _feeRecipient
     ) external;
 
     /// @notice Exchanges all the available assets into the highest yielding maturity

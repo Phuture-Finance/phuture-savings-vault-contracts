@@ -16,6 +16,7 @@ import "./notional/interfaces/IWrappedfCashFactory.sol";
 import { IWrappedfCashComplete } from "./notional/interfaces/IWrappedfCash.sol";
 import "./notional/lib/Constants.sol";
 import "./IFRPVault.sol";
+import "./libraries/AUMCalculationLibrary.sol";
 
 /// @title Fixed rate product vault
 /// @notice Contains logic for integration with Notional
@@ -31,14 +32,31 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
     /// @notice Base point number
     uint16 internal constant BP = 10_000;
 
+    /// @notice AUM scaled per seconds rate
+    uint public constant AUM_SCALED_PER_SECONDS_RATE = 1000000003340960040392850629;
+    /// @notice Minting fee in basis points[0 - 10_000]
+    uint public constant MINTING_FEE_IN_BP = 20;
+    /// @notice Burning fee in basis points[0 - 10_000]
+    uint public constant BURNING_FEE_IN_BP = 20;
+
+    /// @notice Currency id of asset on Notional
     uint16 public currencyId;
-    IWrappedfCashFactory public wrappedfCashFactory;
-    address public notionalRouter;
-
-    address[] internal fCashPositions;
+    /// @notice Maximum loss allowed during harvesting
     uint16 internal maxLoss;
+    /// @notice Address of Notional router
+    address public notionalRouter;
+    /// @notice Address of wrappedfCash factory
+    IWrappedfCashFactory public wrappedfCashFactory;
+    /// @notice 3 and 6 months maturities
+    address[] internal fCashPositions;
 
-    modifier isVaildMaxLoss(uint16 _maxLoss) {
+    /// @notice Timestamp of last AUM fee charge
+    uint96 internal lastTransferTime;
+    /// @notice Address of the feeRecipient
+    address internal feeRecipient;
+
+    /// @notice Checks if max loss is within acceptable range
+    modifier isValidMaxLoss(uint16 _maxLoss) {
         require(maxLoss <= BP, "FRPVault: MAX_LOSS");
         _;
     }
@@ -56,8 +74,9 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
         uint16 _currencyId,
         IWrappedfCashFactory _wrappedfCashFactory,
         address _notionalRouter,
-        uint16 _maxLoss
-    ) external initializer isVaildMaxLoss(_maxLoss) {
+        uint16 _maxLoss,
+        address _feeRecipient
+    ) external initializer isValidMaxLoss(_maxLoss) {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(VAULT_ADMIN_ROLE, msg.sender);
         _setRoleAdmin(VAULT_MANAGER_ROLE, VAULT_ADMIN_ROLE);
@@ -71,6 +90,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
         wrappedfCashFactory = _wrappedfCashFactory;
         notionalRouter = _notionalRouter;
         maxLoss = _maxLoss;
+        feeRecipient = _feeRecipient;
 
         (uint lowestYieldMaturity, uint highestYieldMaturity) = _sortMarketsByOracleRate();
 
@@ -110,9 +130,45 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
     }
 
     /// @inheritdoc IFRPVault
-    function setMaxLoss(uint16 _maxLoss) external isVaildMaxLoss(_maxLoss) {
+    function setMaxLoss(uint16 _maxLoss) external isValidMaxLoss(_maxLoss) {
         require(hasRole(VAULT_MANAGER_ROLE, msg.sender), "FRPVault: FORBIDDEN");
         maxLoss = _maxLoss;
+    }
+
+    /// @inheritdoc IERC4626Upgradeable
+    function withdraw(
+        uint256 _assets,
+        address _receiver,
+        address _owner
+    ) public virtual override returns (uint256) {
+        require(_assets <= maxWithdraw(_owner), "FRPVault: withdraw more than max");
+        uint256 shares = previewWithdraw(_assets);
+
+        uint fee = _chargeBurningFee(shares, _owner);
+
+        // _assets - previewRedeem(fee) is needed to reduce the amount of assets for withdrawal by asset's worth in fee shares
+        _withdraw(msg.sender, _receiver, _owner, _assets - previewRedeem(fee), shares - fee);
+
+        return shares;
+    }
+
+    /// @inheritdoc IERC4626Upgradeable
+    function redeem(
+        uint256 _shares,
+        address _receiver,
+        address _owner
+    ) public virtual override returns (uint256) {
+        require(_shares <= maxRedeem(_owner), "FRPVault: redeem more than max");
+
+        uint fee = _chargeBurningFee(_shares, _owner);
+
+        // fee shares were transferred in _chargeBurningFee.
+        uint sharesMinusFee = _shares - fee;
+        // Redeem only the assets for shares minus the fee.
+        uint256 assetsMinusFee = previewRedeem(sharesMinusFee);
+        _withdraw(msg.sender, _receiver, _owner, assetsMinusFee, sharesMinusFee);
+
+        return assetsMinusFee;
     }
 
     /// @inheritdoc IERC4626Upgradeable
@@ -128,9 +184,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
         return assetBalance;
     }
 
-    /**
-     * @dev Withdraw/redeem common workflow.
-     */
+    /// @inheritdoc ERC4626Upgradeable
     function _withdraw(
         address _caller,
         address _receiver,
@@ -140,6 +194,32 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
     ) internal override {
         _beforeWithdraw(_assets);
         super._withdraw(_caller, _receiver, _owner, _assets, _shares);
+    }
+
+    /// @inheritdoc ERC4626Upgradeable
+    function _deposit(
+        address _caller,
+        address _receiver,
+        uint256 _assets,
+        uint256 _shares
+    ) internal override {
+        // AUM fee is charged prior to mint event with the old totalSupply
+        _chargeAUMFee();
+        uint fee = (_shares * MINTING_FEE_IN_BP) / BP;
+        if (fee != 0) {
+            _mint(feeRecipient, fee);
+        }
+        super._deposit(_caller, _receiver, _assets, _shares - fee);
+    }
+
+    /// @dev Overrides _transfer to include AUM fee logic
+    function _transfer(
+        address _from,
+        address _to,
+        uint _amount
+    ) internal override {
+        _chargeAUMFee();
+        super._transfer(_from, _to, _amount);
     }
 
     /// @notice Loops through fCash positions and redeems into asset if position has matured
@@ -209,6 +289,37 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
         uint allowance = IERC20Upgradeable(_token).allowance(address(this), _spender);
         if (allowance < _requiredAllowance) {
             IERC20Upgradeable(_token).safeIncreaseAllowance(_spender, type(uint256).max - allowance);
+        }
+    }
+
+    /// @notice Charges the buring and AUM fees while withdrawing/redeeming
+    function _chargeBurningFee(uint _shares, address _sharesOwner) internal returns (uint fee) {
+        fee = (_shares * BURNING_FEE_IN_BP) / BP;
+        if (fee != 0) {
+            // AUM charged inside _transferMethod (_beforeTokenTransfer hook)
+            // Transfer the shares which account for the fee to the feeRecipient
+            _transfer(_sharesOwner, feeRecipient, fee);
+        } else {
+            _chargeAUMFee();
+        }
+    }
+
+    /// @notice Calculates and mints AUM fee to feeRecipient
+    function _chargeAUMFee() internal {
+        uint timePassed = uint96(block.timestamp) - lastTransferTime;
+        if (timePassed != 0) {
+            address _feeRecipient = feeRecipient;
+            uint fee = ((totalSupply() - balanceOf(_feeRecipient)) *
+                (AUMCalculationLibrary.rpow(
+                    AUM_SCALED_PER_SECONDS_RATE,
+                    timePassed,
+                    AUMCalculationLibrary.RATE_SCALE_BASE
+                ) - AUMCalculationLibrary.RATE_SCALE_BASE)) / AUMCalculationLibrary.RATE_SCALE_BASE;
+
+            if (fee != 0) {
+                _mint(_feeRecipient, fee);
+                lastTransferTime = uint96(block.timestamp);
+            }
         }
     }
 
