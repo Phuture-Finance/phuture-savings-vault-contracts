@@ -98,15 +98,15 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
 
         IWrappedfCashFactory _wrappedfCashFactory = wrappedfCashFactory;
         uint16 _currencyId = currencyId;
-        address lowestYieldFCash = _wrappedfCashFactory.deployWrapper(_currencyId, uint40(lowestYieldMaturity));
-        address highestYieldFCash = _wrappedfCashFactory.deployWrapper(_currencyId, uint40(highestYieldMaturity));
-        _sortfCashPositions(lowestYieldFCash, highestYieldFCash);
+        address lowestYieldfCash = _wrappedfCashFactory.deployWrapper(_currencyId, uint40(lowestYieldMaturity));
+        address highestYieldfCash = _wrappedfCashFactory.deployWrapper(_currencyId, uint40(highestYieldMaturity));
+        _sortfCashPositions(lowestYieldfCash, highestYieldfCash);
 
-        uint fCashAmount = _convertAssetsTofCash(deposited, IWrappedfCashComplete(highestYieldFCash));
-        _safeApprove(_asset, highestYieldFCash, deposited);
+        uint fCashAmount = _convertAssetsTofCash(deposited, IWrappedfCashComplete(highestYieldfCash));
+        _safeApprove(_asset, highestYieldfCash, deposited);
 
-        IWrappedfCashComplete(highestYieldFCash).mintViaUnderlying(deposited, uint88(fCashAmount), address(this), 0);
-        emit FCashMinted(IWrappedfCashComplete(highestYieldFCash), deposited, fCashAmount);
+        IWrappedfCashComplete(highestYieldfCash).mintViaUnderlying(deposited, uint88(fCashAmount), address(this), 0);
+        emit FCashMinted(IWrappedfCashComplete(highestYieldfCash), deposited, fCashAmount);
     }
 
     /// @inheritdoc IFRPVault
@@ -162,9 +162,10 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
         IERC20MetadataUpgradeable _asset = IERC20MetadataUpgradeable(asset());
         uint assetBalance = _asset.balanceOf(address(this));
         if (assetBalance < _assets) {
+            // (10**_asset.decimals() / 10**3) is a buffer vaule to account for inaccurate estimation of fCash needed to withdraw the asset amount needed.
+            // For further details refer to Notional docs: https://docs.notional.finance/developer-documentation/how-to/lend-and-borrow-fcash/wrapped-fcash
             uint amountNeeded = _assets + (10**_asset.decimals() / 10**3) - assetBalance;
-            uint fCashPositionLength = fCashPositions.length;
-            for (uint i = 0; i < fCashPositionLength; i++) {
+            for (uint i = 0; i < SUPPORTED_MATURITIES; i++) {
                 IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions[i]);
                 uint fCashAmountAvailable = fCashPosition.balanceOf(address(this));
                 if (fCashAmountAvailable == 0) {
@@ -172,12 +173,13 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
                 }
                 uint fCashAmountNeeded = fCashPosition.previewWithdraw(amountNeeded);
 
-                if (fCashAmountNeeded > fCashAmountAvailable) {
-                    // there isn't enough assets in this position, withdraw all and move to the next maturity
-                    fCashPosition.redeemToUnderlying(fCashAmountAvailable, address(this), type(uint32).max);
-                    amountNeeded -= _asset.balanceOf(address(this));
+                fCashAmountAvailable < fCashAmountNeeded
+                    ? fCashPosition.redeemToUnderlying(fCashAmountAvailable, address(this), type(uint32).max)
+                    : fCashPosition.redeemToUnderlying(fCashAmountNeeded, address(this), type(uint32).max);
+                uint assetBalanceAfterReedem = _asset.balanceOf(address(this));
+                if (amountNeeded > assetBalanceAfterReedem) {
+                    amountNeeded -= assetBalanceAfterReedem;
                 } else {
-                    fCashPosition.redeemToUnderlying(fCashAmountNeeded, address(this), type(uint32).max);
                     break;
                 }
             }
@@ -185,13 +187,13 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
     }
 
     /// @notice Sorts fCash positions in case there was a change with respect to the previous state
-    function _sortfCashPositions(address _lowestYieldFCash, address _highestYieldFCash) internal {
+    function _sortfCashPositions(address _lowestYieldfCash, address _highestYieldfCash) internal {
         if (
             keccak256(abi.encodePacked(fCashPositions[0], fCashPositions[1])) !=
-            keccak256(abi.encodePacked(_lowestYieldFCash, _highestYieldFCash))
+            keccak256(abi.encodePacked(_lowestYieldfCash, _highestYieldfCash))
         ) {
-            fCashPositions[0] = _lowestYieldFCash;
-            fCashPositions[1] = _highestYieldFCash;
+            fCashPositions[0] = _lowestYieldfCash;
+            fCashPositions[1] = _highestYieldfCash;
         }
     }
 
