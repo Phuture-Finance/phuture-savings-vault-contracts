@@ -32,20 +32,20 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
     /// @notice Base point number
     uint16 internal constant BP = 10_000;
 
-    /// @notice AUM scaled per seconds rate
-    uint public constant AUM_SCALED_PER_SECONDS_RATE = 1000000003340960040392850629;
-    /// @notice Minting fee in basis points[0 - 10_000]
+    /// @inheritdoc IFRPVault
+    uint public constant AUM_SCALED_PER_SECONDS_RATE = 1000000000158946658547141217;
+    /// @inheritdoc IFRPVault
     uint public constant MINTING_FEE_IN_BP = 20;
-    /// @notice Burning fee in basis points[0 - 10_000]
+    /// @inheritdoc IFRPVault
     uint public constant BURNING_FEE_IN_BP = 20;
 
-    /// @notice Currency id of asset on Notional
+    /// @inheritdoc IFRPVault
     uint16 public currencyId;
     /// @notice Maximum loss allowed during harvesting
     uint16 internal maxLoss;
-    /// @notice Address of Notional router
+    /// @inheritdoc IFRPVault
     address public notionalRouter;
-    /// @notice Address of wrappedfCash factory
+    /// @inheritdoc IFRPVault
     IWrappedfCashFactory public wrappedfCashFactory;
     /// @notice 3 and 6 months maturities
     address[] internal fCashPositions;
@@ -55,7 +55,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
     /// @notice Address of the feeRecipient
     address internal feeRecipient;
 
-    /// @notice Checks if max loss is within acceptable range
+    /// @notice Checks if max loss is within an acceptable range
     modifier isValidMaxLoss(uint16 _maxLoss) {
         require(maxLoss <= BP, "FRPVault: MAX_LOSS");
         _;
@@ -145,7 +145,6 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
         uint256 shares = previewWithdraw(_assets);
 
         uint fee = _chargeBurningFee(shares, _owner);
-
         // _assets - previewRedeem(fee) is needed to reduce the amount of assets for withdrawal by asset's worth in fee shares
         _withdraw(msg.sender, _receiver, _owner, _assets - previewRedeem(fee), shares - fee);
 
@@ -213,6 +212,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
     }
 
     /// @dev Overrides _transfer to include AUM fee logic
+    /// @inheritdoc ERC20Upgradeable
     function _transfer(
         address _from,
         address _to,
@@ -296,7 +296,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
     function _chargeBurningFee(uint _shares, address _sharesOwner) internal returns (uint fee) {
         fee = (_shares * BURNING_FEE_IN_BP) / BP;
         if (fee != 0) {
-            // AUM charged inside _transferMethod (_beforeTokenTransfer hook)
+            // AUM charged inside _transfer
             // Transfer the shares which account for the fee to the feeRecipient
             _transfer(_sharesOwner, feeRecipient, fee);
         } else {
@@ -315,7 +315,6 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
                     timePassed,
                     AUMCalculationLibrary.RATE_SCALE_BASE
                 ) - AUMCalculationLibrary.RATE_SCALE_BASE)) / AUMCalculationLibrary.RATE_SCALE_BASE;
-
             if (fee != 0) {
                 _mint(_feeRecipient, fee);
                 lastTransferTime = uint96(block.timestamp);
