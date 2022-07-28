@@ -36,7 +36,7 @@ jobs:
 
       - name: Run Forge tests
         run: |
-          forge test echo ${{secrets.MAINNET_HTTPS_URL}} | sed 's/./& /g'
+          forge test
         id: forge-test
 
   hardhat:
