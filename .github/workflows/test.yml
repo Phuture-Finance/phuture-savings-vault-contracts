@@ -8,6 +8,7 @@ on:
 
 env:
   FOUNDRY_PROFILE: ci
+  MAINNET_HTTPS_URL: ${{ secrets.MAINNET_HTTPS_URL }}
 
 jobs:
   foundry:
@@ -25,8 +26,6 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
-        env:
-          MAINNET_HTTPS_URL: ${{ secrets.MAINNET_HTTPS_URL }}
 
       - name: Run Forge build
         run: |
@@ -35,7 +34,7 @@ jobs:
         id: build
 
       - name: Run Forge tests
-        run: bash ./scripts/foundry.sh
+        run: forge test
         id: forge-test
 
   hardhat:
