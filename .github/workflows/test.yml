@@ -35,7 +35,7 @@ jobs:
 
       - name: Run Forge tests
         run: |
-          npm run forge-test
+          forge test
         id: forge-test
 
   hardhat:
