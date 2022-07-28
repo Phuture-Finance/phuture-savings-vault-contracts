@@ -1,1 +1,2 @@
-forge test $MAINNET_HTTPS_URL
+export $MAINNET_HTTPS_URL
+forge test
