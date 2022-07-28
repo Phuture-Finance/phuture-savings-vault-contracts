@@ -15,6 +15,7 @@ import { NotionalViews, MarketParameters } from "./notional/interfaces/INotional
 import "./notional/interfaces/IWrappedfCashFactory.sol";
 import { IWrappedfCashComplete } from "./notional/interfaces/IWrappedfCash.sol";
 import "./notional/lib/Constants.sol";
+import "./notional/lib/DateTime.sol";
 import "./IFRPVault.sol";
 import "./libraries/AUMCalculationLibrary.sol";
 
@@ -57,7 +58,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
 
     /// @notice Checks if max loss is within an acceptable range
     modifier isValidMaxLoss(uint16 _maxLoss) {
-        require(maxLoss <= BP, "FRPVault: MAX_LOSS");
+        require(_maxLoss <= BP, "FRPVault: MAX_LOSS");
         _;
     }
 
@@ -85,12 +86,14 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
         __ERC20_init(_name, _symbol);
         __ERC20Permit_init(_name);
         __AccessControl_init();
+        __UUPSUpgradeable_init();
 
         currencyId = _currencyId;
         wrappedfCashFactory = _wrappedfCashFactory;
         notionalRouter = _notionalRouter;
         maxLoss = _maxLoss;
         feeRecipient = _feeRecipient;
+        lastTransferTime = uint96(block.timestamp);
 
         (uint lowestYieldMaturity, uint highestYieldMaturity) = _sortMarketsByOracleRate();
 
@@ -140,15 +143,17 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
         uint256 _assets,
         address _receiver,
         address _owner
-    ) public virtual override returns (uint256) {
+    ) public override returns (uint256) {
         require(_assets <= maxWithdraw(_owner), "FRPVault: withdraw more than max");
-        uint256 shares = previewWithdraw(_assets);
-
+        // determine the amount of shares for the assets without the fees
+        uint shares = convertToShares(_assets);
+        // determine the burning fee on top of the estimated shares for withdrawing the exact asset output
+        // cannot use the previewWithdraw since it already accounts for the burning fee
         uint fee = _chargeBurningFee(shares, _owner);
-        // _assets - previewRedeem(fee) is needed to reduce the amount of assets for withdrawal by asset's worth in fee shares
-        _withdraw(msg.sender, _receiver, _owner, _assets - previewRedeem(fee), shares - fee);
-
-        return shares;
+        // burn shares
+        _withdraw(msg.sender, _receiver, _owner, _assets, shares);
+        // returns the shares plus fee
+        return shares + fee;
     }
 
     /// @inheritdoc IERC4626Upgradeable
@@ -156,18 +161,85 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
         uint256 _shares,
         address _receiver,
         address _owner
-    ) public virtual override returns (uint256) {
+    ) public override returns (uint256) {
         require(_shares <= maxRedeem(_owner), "FRPVault: redeem more than max");
-
+        // previewReedem is fine to use here since we are dealing with exact input of shares so we calculate burning fee on that
+        uint256 assetsMinusFee = previewRedeem(_shares);
         uint fee = _chargeBurningFee(_shares, _owner);
-
-        // fee shares were transferred in _chargeBurningFee.
-        uint sharesMinusFee = _shares - fee;
-        // Redeem only the assets for shares minus the fee.
-        uint256 assetsMinusFee = previewRedeem(sharesMinusFee);
-        _withdraw(msg.sender, _receiver, _owner, assetsMinusFee, sharesMinusFee);
+        // burns _shares - fee since fee is transferred to the feeRecipient
+        _withdraw(msg.sender, _receiver, _owner, assetsMinusFee, _shares - fee);
 
         return assetsMinusFee;
+    }
+
+    /// @inheritdoc ERC4626Upgradeable
+    function mint(uint256 shares, address receiver) public override returns (uint256) {
+        require(shares <= maxMint(receiver), "FRPVault: mint more than max");
+
+        uint256 assets = convertToAssets(shares);
+
+        uint fee = (shares * MINTING_FEE_IN_BP) / BP;
+        uint feeInAssets = convertToAssets(fee);
+        if (fee != 0) {
+            _mint(feeRecipient, fee);
+        }
+        _chargeAUMFee();
+        // we need to mint exact number of shares
+        _deposit(_msgSender(), receiver, assets + feeInAssets, shares);
+
+        return assets + feeInAssets;
+    }
+
+    /// @inheritdoc ERC4626Upgradeable
+    function deposit(uint256 _assets, address _receiver) public override returns (uint256) {
+        require(_assets <= maxDeposit(_receiver), "FRPVault: deposit more than max");
+        // calculate the shares to mint
+        uint shares = convertToShares(_assets);
+        // charge the actual fees
+        _chargeAUMFee();
+        uint fee = (shares * MINTING_FEE_IN_BP) / BP;
+        if (fee != 0) {
+            _mint(feeRecipient, fee);
+        }
+        _deposit(msg.sender, _receiver, _assets, shares - fee);
+        return shares - fee;
+    }
+
+    /// @inheritdoc IERC4626Upgradeable
+    function previewWithdraw(uint256 _assets) public view override returns (uint256) {
+        uint shares = convertToShares(_assets);
+        uint burningFee = (shares * BURNING_FEE_IN_BP) / BP;
+        // To withdraw asset amount on top of needed shares burning fee is added
+        return shares + burningFee;
+    }
+
+    /// @inheritdoc IERC4626Upgradeable
+    function previewRedeem(uint256 _shares) public view override returns (uint256) {
+        uint burningFee = (_shares * BURNING_FEE_IN_BP) / BP;
+        // amount of assets received is reduced by the shares amount
+        return convertToAssets(_shares - burningFee);
+    }
+
+    /// @inheritdoc ERC4626Upgradeable
+    function previewMint(uint256 shares) public view override returns (uint256) {
+        uint assets = super.previewMint(shares);
+        uint mintingFee = (assets * MINTING_FEE_IN_BP) / BP;
+        // While minting exact amount of shares user needs to transfer asset plus fees on top of those assets
+        return assets + mintingFee;
+    }
+
+    /// @inheritdoc ERC4626Upgradeable
+    function previewDeposit(uint256 _assets) public view override returns (uint256) {
+        uint shares = super.previewDeposit(_assets);
+        uint fee = (shares * MINTING_FEE_IN_BP) / BP;
+        // While depositing exact amount of assets user receives shares minus fee payed on that amount
+        return shares - fee;
+    }
+
+    /// @inheritdoc IERC4626Upgradeable
+    function maxWithdraw(address _owner) public view virtual override returns (uint256) {
+        // max withdraw asset amount is equal to shares / 1 + burning_fee
+        return convertToAssets((balanceOf(_owner) * BP) / (BP + BURNING_FEE_IN_BP));
     }
 
     /// @inheritdoc IERC4626Upgradeable
@@ -195,22 +267,6 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
         super._withdraw(_caller, _receiver, _owner, _assets, _shares);
     }
 
-    /// @inheritdoc ERC4626Upgradeable
-    function _deposit(
-        address _caller,
-        address _receiver,
-        uint256 _assets,
-        uint256 _shares
-    ) internal override {
-        // AUM fee is charged prior to mint event with the old totalSupply
-        _chargeAUMFee();
-        uint fee = (_shares * MINTING_FEE_IN_BP) / BP;
-        if (fee != 0) {
-            _mint(feeRecipient, fee);
-        }
-        super._deposit(_caller, _receiver, _assets, _shares - fee);
-    }
-
     /// @dev Overrides _transfer to include AUM fee logic
     /// @inheritdoc ERC20Upgradeable
     function _transfer(
@@ -224,8 +280,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
 
     /// @notice Loops through fCash positions and redeems into asset if position has matured
     function _redeemAssetsIfMarketMatured() internal {
-        uint fCashPositionLength = fCashPositions.length;
-        for (uint i = 0; i < fCashPositionLength; i++) {
+        for (uint i = 0; i < SUPPORTED_MATURITIES; i++) {
             IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions[i]);
             if (fCashPosition.hasMatured()) {
                 uint fCashAmount = fCashPosition.balanceOf(address(this));
@@ -242,9 +297,10 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
         IERC20MetadataUpgradeable _asset = IERC20MetadataUpgradeable(asset());
         uint assetBalance = _asset.balanceOf(address(this));
         if (assetBalance < _assets) {
-            // (10**_asset.decimals() / 10**3) is a buffer vaule to account for inaccurate estimation of fCash needed to withdraw the asset amount needed.
+            // (10**_asset.decimals() / 10**3) is a buffer value to account for inaccurate estimation of fCash needed to withdraw the asset amount needed.
             // For further details refer to Notional docs: https://docs.notional.finance/developer-documentation/how-to/lend-and-borrow-fcash/wrapped-fcash
-            uint amountNeeded = _assets + (10**_asset.decimals() / 10**3) - assetBalance;
+            uint bufferAmount = 10**_asset.decimals() / 10**3;
+            uint amountNeeded = _assets + bufferAmount - assetBalance;
             for (uint i = 0; i < SUPPORTED_MATURITIES; i++) {
                 IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions[i]);
                 uint fCashAmountAvailable = fCashPosition.balanceOf(address(this));
@@ -256,9 +312,10 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
                 fCashAmountAvailable < fCashAmountNeeded
                     ? fCashPosition.redeemToUnderlying(fCashAmountAvailable, address(this), type(uint32).max)
                     : fCashPosition.redeemToUnderlying(fCashAmountNeeded, address(this), type(uint32).max);
-                uint assetBalanceAfterReedem = _asset.balanceOf(address(this));
-                if (amountNeeded > assetBalanceAfterReedem) {
-                    amountNeeded -= assetBalanceAfterReedem;
+                uint assetBalanceAfterRedeem = _asset.balanceOf(address(this));
+                // In case of withdrawing from second maturity buffer is reapplied to account for possible inaccuracies in previewWithdraw method.
+                if (amountNeeded - bufferAmount > assetBalanceAfterRedeem) {
+                    amountNeeded = amountNeeded + bufferAmount - assetBalanceAfterRedeem;
                 } else {
                     break;
                 }
@@ -372,7 +429,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
 
     /// @inheritdoc UUPSUpgradeable
     function _authorizeUpgrade(address _newImpl) internal view virtual override {
-        require(hasRole(VAULT_ADMIN_ROLE, msg.sender), "FRPVault: FORBIDDEN");
+        require(hasRole(VAULT_MANAGER_ROLE, msg.sender), "FRPVault: FORBIDDEN");
     }
 
     uint256[45] private __gap;
