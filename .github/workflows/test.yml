@@ -35,7 +35,7 @@ jobs:
         id: build
 
       - name: Run Forge tests
-        run: sudo ./scripts/foundry.sh
+        run: sudo scripts/foundry.sh
         id: forge-test
 
   hardhat:
