@@ -1,1 +1,1 @@
-source ./.env && forge test
+forge test
