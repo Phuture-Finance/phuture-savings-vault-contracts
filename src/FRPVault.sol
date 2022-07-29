@@ -173,19 +173,19 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
     }
 
     /// @inheritdoc ERC4626Upgradeable
-    function mint(uint256 shares, address receiver) public override returns (uint256) {
-        require(shares <= maxMint(receiver), "FRPVault: mint more than max");
+    function mint(uint256 _shares, address receiver) public override returns (uint256) {
+        require(_shares <= maxMint(receiver), "FRPVault: mint more than max");
 
-        uint256 assets = convertToAssets(shares);
+        uint256 assets = convertToAssets(_shares);
 
-        uint fee = (shares * MINTING_FEE_IN_BP) / BP;
+        uint fee = (_shares * MINTING_FEE_IN_BP) / BP;
         uint feeInAssets = convertToAssets(fee);
         if (fee != 0) {
             _mint(feeRecipient, fee);
         }
         _chargeAUMFee();
         // we need to mint exact number of shares
-        _deposit(_msgSender(), receiver, assets + feeInAssets, shares);
+        _deposit(msg.sender, receiver, assets + feeInAssets, _shares);
 
         return assets + feeInAssets;
     }
@@ -221,8 +221,8 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
     }
 
     /// @inheritdoc ERC4626Upgradeable
-    function previewMint(uint256 shares) public view override returns (uint256) {
-        uint assets = super.previewMint(shares);
+    function previewMint(uint256 _shares) public view override returns (uint256) {
+        uint assets = super.previewMint(_shares);
         uint mintingFee = (assets * MINTING_FEE_IN_BP) / BP;
         // While minting exact amount of shares user needs to transfer asset plus fees on top of those assets
         return assets + mintingFee;
