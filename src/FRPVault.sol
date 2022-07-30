@@ -295,31 +295,46 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
     /// @param _assets Amount of assets for withdrawal
     function _beforeWithdraw(uint _assets) internal virtual {
         IERC20MetadataUpgradeable _asset = IERC20MetadataUpgradeable(asset());
-        uint assetBalance = _asset.balanceOf(address(this));
-        if (assetBalance < _assets) {
+        if (_asset.balanceOf(address(this)) < _assets) {
             // (10**_asset.decimals() / 10**3) is a buffer value to account for inaccurate estimation of fCash needed to withdraw the asset amount needed.
             // For further details refer to Notional docs: https://docs.notional.finance/developer-documentation/how-to/lend-and-borrow-fcash/wrapped-fcash
             uint bufferAmount = 10**_asset.decimals() / 10**3;
-            uint amountNeeded = _assets + bufferAmount - assetBalance;
             for (uint i = 0; i < SUPPORTED_MATURITIES; i++) {
+                uint assetBalanceBeforeRedeem = _asset.balanceOf(address(this));
+                uint amountNeeded = _assets + bufferAmount - assetBalanceBeforeRedeem;
                 IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions[i]);
                 uint fCashAmountAvailable = fCashPosition.balanceOf(address(this));
                 if (fCashAmountAvailable == 0) {
                     continue;
                 }
                 uint fCashAmountNeeded = fCashPosition.previewWithdraw(amountNeeded);
+                uint fCashAmountBurned = _redeemToUnderlying(fCashAmountAvailable, fCashAmountNeeded, fCashPosition);
 
-                fCashAmountAvailable < fCashAmountNeeded
-                    ? fCashPosition.redeemToUnderlying(fCashAmountAvailable, address(this), type(uint32).max)
-                    : fCashPosition.redeemToUnderlying(fCashAmountNeeded, address(this), type(uint32).max);
                 uint assetBalanceAfterRedeem = _asset.balanceOf(address(this));
-                // In case of withdrawing from second maturity buffer is reapplied to account for possible inaccuracies in previewWithdraw method.
-                if (amountNeeded - bufferAmount > assetBalanceAfterRedeem) {
-                    amountNeeded = amountNeeded + bufferAmount - assetBalanceAfterRedeem;
-                } else {
+                emit FCashRedeemed(
+                    fCashPosition,
+                    assetBalanceAfterRedeem - assetBalanceBeforeRedeem,
+                    fCashAmountBurned
+                );
+                if (assetBalanceAfterRedeem >= _assets) {
                     break;
                 }
             }
+        }
+    }
+
+    /// @notice Redeems fCash for underlying asset
+    function _redeemToUnderlying(
+        uint fCashAmountAvailable,
+        uint fCashAmountNeeded,
+        IWrappedfCashComplete fCashPosition
+    ) internal returns (uint fCashAmountBurned) {
+        if (fCashAmountAvailable < fCashAmountNeeded) {
+            fCashAmountBurned = fCashAmountAvailable;
+            fCashPosition.redeemToUnderlying(fCashAmountAvailable, address(this), type(uint32).max);
+        } else {
+            fCashAmountBurned = fCashAmountNeeded;
+            fCashPosition.redeemToUnderlying(fCashAmountNeeded, address(this), type(uint32).max);
         }
     }
 
@@ -432,5 +447,5 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
         require(hasRole(VAULT_MANAGER_ROLE, msg.sender), "FRPVault: FORBIDDEN");
     }
 
-    uint256[45] private __gap;
+    uint256[46] private __gap;
 }

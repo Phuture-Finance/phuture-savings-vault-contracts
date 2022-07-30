@@ -21,6 +21,7 @@ contract FrpVaultTest is Test {
     using Address for address;
 
     event FCashMinted(IWrappedfCashComplete indexed _fCashPosition, uint _assetAmount, uint _fCashAmount);
+    event FCashRedeemed(IWrappedfCashComplete indexed _fCashPosition, uint _assetAmount, uint _fCashAmount);
 
     address setupMsgSender = address(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
 
@@ -473,23 +474,34 @@ contract FrpVaultTest is Test {
         );
         FRPVaultProxy.harvest(amount);
 
+        // Deposit some usdc without harvesting
+        FRPVaultProxy.deposit(6_000 * 1e6, usdcWhale);
+
         address[] memory positions = FRPVaultProxy._fCashPositions();
         IWrappedfCashComplete lowestYieldFCash = IWrappedfCashComplete(positions[0]);
         IWrappedfCashComplete highestYieldFCash = IWrappedfCashComplete(positions[1]);
 
         // withdrawing from a single maturity
         FRPVaultProxy.withdraw(amount / 2, usdcWhale, usdcWhale);
+        assertEq(lowestYieldFCash.balanceOf(address(FRPVaultProxy)), 1005021519000);
+        assertEq(highestYieldFCash.balanceOf(address(FRPVaultProxy)), 1009501065000);
+        assertEq(usdc.balanceOf(address(FRPVaultProxy)), 1000_000_011);
+
         // withdrawing from both maturities
+        vm.expectEmit(true, false, false, true);
+        emit FCashRedeemed(lowestYieldFCash, 9_988_703_155, 1005021519000);
+        vm.expectEmit(true, false, false, true);
+        emit FCashRedeemed(highestYieldFCash, 9_888_549_841, 1000890183164);
         FRPVaultProxy.redeem(FRPVaultProxy.balanceOf(usdcWhale), usdcWhale, usdcWhale);
 
         assertEq(lowestYieldFCash.balanceOf(address(FRPVaultProxy)), 0);
-        assertEq(highestYieldFCash.balanceOf(address(FRPVaultProxy)), 6467496096);
+        assertEq(highestYieldFCash.balanceOf(address(FRPVaultProxy)), 8610881836);
         assertEq(FRPVaultProxy.balanceOf(usdcWhale), 0);
-        assertEq(usdc.balanceOf(address(FRPVaultProxy)), 996);
+        assertEq(usdc.balanceOf(address(FRPVaultProxy)), 997);
 
         uint balanceAfterWithdrawal = usdc.balanceOf(usdcWhale);
         // User losses certain amount of USDC due to slippage
-        assertEq(balanceBeforeDeposit - balanceAfterWithdrawal, 101560598);
+        assertEq(balanceBeforeDeposit - balanceAfterWithdrawal, 122747990);
     }
 
     function testAssetWithDifferentDecimals() public {
@@ -561,10 +573,124 @@ contract FrpVaultTest is Test {
         FRPVaultProxy.upgradeTo(address(new FRPVault()));
     }
 
-    // TODO vm.expectRevert has a bug. should be named testCannotUpgradeWithoutRole()
     function testFailsUpgradeWithoutRole() public {
-        vm.expectRevert(bytes("FRPVault: FORBIDDEN"));
         FRPVaultProxy.upgradeTo(address(new FRPVault()));
+    }
+
+    function testStorage() public {
+        bytes32 zeroValue = 0x0000000000000000000000000000000000000000000000000000000000000000;
+
+        // 1st slot is occupied by Initializable =>  _initialized and _initializing;
+        bytes32 zeroSlot = vm.load(address(FRPVaultProxy), bytes32(uint256(0)));
+        assertEq(zeroSlot, bytes32(uint(1)));
+
+        // Next 50 slots are _gap inside ContextUpgradeable contract
+        for (uint i = 1; i < 51; i++) {
+            bytes32 slot = vm.load(address(FRPVaultProxy), bytes32(uint256(i)));
+            assertEq(slot, zeroValue);
+        }
+
+        // Next 3 slots are _balances, _allowances, _totalSupply mappings inside ERC20Upgradeable
+        for (uint i = 51; i < 54; i++) {
+            bytes32 slot = vm.load(address(FRPVaultProxy), bytes32(uint256(i)));
+            assertEq(slot, zeroValue);
+        }
+
+        // Next slot is token name
+        bytes32 slot54 = vm.load(address(FRPVaultProxy), bytes32(uint256(54)));
+        assertEq(slot54, 0x55534443204e6f74696f6e616c205661756c7400000000000000000000000026);
+
+        // Next slot is token symbol
+        bytes32 slot55 = vm.load(address(FRPVaultProxy), bytes32(uint256(55)));
+        assertEq(slot55, 0x555344435f5641554c5400000000000000000000000000000000000000000014);
+
+        // Next 45 slots are _gap inside ERC20Upgradeable
+        for (uint i = 56; i < 101; i++) {
+            bytes32 slot = vm.load(address(FRPVaultProxy), bytes32(uint256(i)));
+            assertEq(slot, zeroValue);
+        }
+
+        // Next slot is the address of usdc inside ERC4626Upgradeable
+        bytes32 slot101 = vm.load(address(FRPVaultProxy), bytes32(uint256(101)));
+        assertEq(slot101, 0x000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48);
+
+        // Next 49 slots are _gap inside ERC4626Upgradeable
+        for (uint i = 102; i < 151; i++) {
+            bytes32 slot = vm.load(address(FRPVaultProxy), bytes32(uint256(i)));
+            assertEq(slot, zeroValue);
+        }
+
+        // Next slot is _HASHED_NAME inside EIP712Upgradeable
+        bytes32 slot151 = vm.load(address(FRPVaultProxy), bytes32(uint256(151)));
+        assertEq(slot151, 0x318587b3a21ebf41642203d8f1916c85e928263edb04cf93c681903c93e27cc4);
+
+        // Next slot is _HASHED_VERSION inside EIP712Upgradeable
+        bytes32 slot152 = vm.load(address(FRPVaultProxy), bytes32(uint256(152)));
+        assertEq(slot152, 0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6);
+
+        // Next 50 slots are _gap inside EIP712Upgradeable
+        for (uint i = 153; i < 203; i++) {
+            bytes32 slot = vm.load(address(FRPVaultProxy), bytes32(uint256(i)));
+            assertEq(slot, zeroValue);
+        }
+
+        // Next slot is _nonces mapping inside ERC20PermitUpgradeable
+        bytes32 slot203 = vm.load(address(FRPVaultProxy), bytes32(uint256(203)));
+        assertEq(slot203, zeroValue);
+
+        // Next slot is _PERMIT_TYPEHASH_DEPRECATED_SLOT mapping inside ERC20PermitUpgradeable
+        bytes32 slot204 = vm.load(address(FRPVaultProxy), bytes32(uint256(204)));
+        assertEq(slot204, zeroValue);
+
+        // Next 49 slots are _gap inside ERC20PermitUpgradeable
+        for (uint i = 205; i < 254; i++) {
+            bytes32 slot = vm.load(address(FRPVaultProxy), bytes32(uint256(i)));
+            assertEq(slot, zeroValue);
+        }
+
+        // Next 50 slots are _gap inside ERC165Upgradeable
+        for (uint i = 254; i < 304; i++) {
+            bytes32 slot = vm.load(address(FRPVaultProxy), bytes32(uint256(i)));
+            assertEq(slot, zeroValue);
+        }
+
+        // Next slot is _roles mapping inside AccessControlUpgradeable
+        bytes32 slot305 = vm.load(address(FRPVaultProxy), bytes32(uint256(305)));
+        assertEq(slot305, zeroValue);
+
+        // Next 49 slots are _gap inside AccessControlUpgradeable
+        for (uint i = 306; i < 355; i++) {
+            bytes32 slot = vm.load(address(FRPVaultProxy), bytes32(uint256(i)));
+            assertEq(slot, zeroValue);
+        }
+
+        // Next 50 slots are _gap inside ERC1967UpgradeUpgradeable
+        for (uint i = 355; i < 405; i++) {
+            bytes32 slot = vm.load(address(FRPVaultProxy), bytes32(uint256(i)));
+            assertEq(slot, zeroValue);
+        }
+
+        // Next 50 slots are _gap inside UUPSUpgradeable
+        for (uint i = 405; i < 454; i++) {
+            bytes32 slot = vm.load(address(FRPVaultProxy), bytes32(uint256(i)));
+            assertEq(slot, zeroValue);
+        }
+
+        // Next slot is currencyId, maxLoss and notionalRouter inside FRPVault
+        bytes32 slot454 = vm.load(address(FRPVaultProxy), bytes32(uint256(454)));
+        assertEq(slot454, 0x00000000000000001344a36a1b56144c3bc62e7757377d288fde036926480003);
+
+        // Next slot is wrappedfCashFactory inside FRPVault
+        bytes32 slot455 = vm.load(address(FRPVaultProxy), bytes32(uint256(455)));
+        assertEq(slot455, 0x0000000000000000000000005d051deb5db151c2172dcdccd42e6a2953e27261);
+
+        // Next slot is fCashPositions inside FRPVault
+        bytes32 slot456 = vm.load(address(FRPVaultProxy), bytes32(uint256(456)));
+        assertEq(slot456, 0x0000000000000000000000000000000000000000000000000000000000000002);
+
+        // Next slot is lastTransferTime and feeRecipient inside FRPVault
+        bytes32 slot457 = vm.load(address(FRPVaultProxy), bytes32(uint256(457)));
+        assertEq(slot457, 0x000000000000000000000000000000000000abcd000000000000000062d68ebe);
     }
 
     // Internal helper functions for setting-up the system
