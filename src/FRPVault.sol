@@ -9,6 +9,7 @@ import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/utils/SafeERC20
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/IERC20Upgradeable.sol";
+import "openzeppelin-contracts-upgradeable/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 import { NotionalViews, MarketParameters } from "./notional/interfaces/INotional.sol";
@@ -21,7 +22,7 @@ import "./libraries/AUMCalculationLibrary.sol";
 
 /// @title Fixed rate product vault
 /// @notice Contains logic for integration with Notional
-contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, AccessControlUpgradeable, UUPSUpgradeable {
+contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, AccessControlUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     /// @notice Responsible for all vault related permissions
@@ -107,7 +108,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
     }
 
     /// @inheritdoc IFRPVault
-    function harvest(uint _maxDepositedAmount) external {
+    function harvest(uint _maxDepositedAmount) external nonReentrant {
         _redeemAssetsIfMarketMatured();
 
         address _asset = asset();
@@ -262,7 +263,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
         address _owner,
         uint _assets,
         uint _shares
-    ) internal override {
+    ) internal override nonReentrant {
         _beforeWithdraw(_assets);
         super._withdraw(_caller, _receiver, _owner, _assets, _shares);
     }
@@ -293,7 +294,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
 
     /// @notice Withdraws asset from maturities
     /// @param _assets Amount of assets for withdrawal
-    function _beforeWithdraw(uint _assets) internal virtual {
+    function _beforeWithdraw(uint _assets) internal {
         IERC20MetadataUpgradeable _asset = IERC20MetadataUpgradeable(asset());
         if (_asset.balanceOf(address(this)) < _assets) {
             // (10**_asset.decimals() / 10**3) is a buffer value to account for inaccurate estimation of fCash needed to withdraw the asset amount needed.
