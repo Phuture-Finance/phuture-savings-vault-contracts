@@ -3,6 +3,7 @@ import '@typechain/hardhat'
 import 'dotenv/config'
 // eslint-disable-next-line unicorn/prefer-node-protocol
 import fs from 'fs'
+import 'hardhat-gas-reporter'
 import 'hardhat-log-remover'
 import 'hardhat-preprocessor'
 import { HardhatUserConfig } from 'hardhat/config'
@@ -63,6 +64,13 @@ const config: HardhatUserConfig = {
       url: 'https://chain.frp.phuture.finance/',
       timeout: 100_000_000
     }
+  },
+  gasReporter: {
+    enabled: !!process.env.REPORT_GAS,
+    token: process.env.GAS_TOKEN,
+    gasPriceApi: process.env.GAS_PRICE_API,
+    coinmarketcap: process.env.COINMARKETCAP_API_KEY,
+    currency: process.env.COINMARKETCAP_DEFAULT_CURRENCY
   }
 }
 

@@ -149,7 +149,7 @@ contract FrpVaultTest is Test {
     function testHarvesting() public {
         // USDC whale deposits some USDC in the FRPVault
         vm.startPrank(usdcWhale);
-        uint amount = 1000_000 * 1e6;
+        uint amount = 1_000_000 * 1e6;
         usdc.approve(address(FRPVaultProxy), amount);
         FRPVaultProxy.deposit(amount, usdcWhale);
 
@@ -198,7 +198,7 @@ contract FrpVaultTest is Test {
         FRPVaultProxy.deposit(amountToDeposit, usdcWhale);
         FRPVaultProxy.harvest(amountToDeposit);
 
-        // There is never greater than dust amount left in the vault
+        // There is never greater than dust amount of usdc left in the vault
         assertLt(usdc.balanceOf(address(FRPVaultProxy)), 1_000);
         vm.stopPrank();
     }
@@ -261,7 +261,7 @@ contract FrpVaultTest is Test {
     }
 
     function testWithdrawalFuzzing(uint assets) public {
-        vm.assume(assets < 100_000 * 1e6 && assets > 0);
+        vm.assume(assets < 100_000 * 1e6 && assets > 1);
 
         // Fuzz testing withdrawal
         vm.startPrank(usdcWhale);
@@ -271,8 +271,11 @@ contract FrpVaultTest is Test {
 
         FRPVaultProxy.harvest(type(uint).max);
 
+        // deposit some amount without harvesting
+        FRPVaultProxy.deposit(assets, usdcWhale);
+
         uint amount = FRPVaultProxy.previewRedeem(FRPVaultProxy.balanceOf(usdcWhale));
-        assertLt(amount, assets);
+        assertLt(amount, assets * 2);
 
         FRPVaultProxy.withdraw(amount, usdcWhale, usdcWhale);
 
@@ -404,7 +407,7 @@ contract FrpVaultTest is Test {
         // deposit to assert
         uint sharesReceived = FRPVaultProxy.deposit(assets, usdcWhale);
 
-        // depositor received exact number of shares and transferred exact Usdc
+        // depositor received exact number of shares and transferred exact usdc
         assertEq(sharesEstimated, sharesReceived);
         assertEq(usdcBalanceBefore - usdc.balanceOf(usdcWhale), assets);
         assertEq(FRPVaultProxy.balanceOf(usdcWhale) - sharesInitialDeposit, sharesEstimated);
@@ -415,7 +418,7 @@ contract FrpVaultTest is Test {
         vm.stopPrank();
     }
 
-    function testMintFuzzing() public {
+    function testMint() public {
         uint shares = 100_000 * 1e18 + 1;
 
         vm.startPrank(usdcWhale);
@@ -684,13 +687,17 @@ contract FrpVaultTest is Test {
         bytes32 slot455 = vm.load(address(FRPVaultProxy), bytes32(uint256(455)));
         assertEq(slot455, 0x0000000000000000000000005d051deb5db151c2172dcdccd42e6a2953e27261);
 
-        // Next slot is fCashPositions inside FRPVault
+        // Next slot is fCashPosition inside FRPVault
         bytes32 slot456 = vm.load(address(FRPVaultProxy), bytes32(uint256(456)));
-        assertEq(slot456, 0x0000000000000000000000000000000000000000000000000000000000000002);
+        assertEq(slot456, 0x000000000000000000000000f1e1a4213f241d8fe23990fc16e14eaf37a27028);
+
+        // Next slot is fCashPosition inside FRPVault
+        bytes32 slot457 = vm.load(address(FRPVaultProxy), bytes32(uint256(457)));
+        assertEq(slot457, 0x00000000000000000000000069c6b313506684f49c564b48bf0e4d41c0cb1a3e);
 
         // Next slot is lastTransferTime and feeRecipient inside FRPVault
-        bytes32 slot457 = vm.load(address(FRPVaultProxy), bytes32(uint256(457)));
-        assertEq(slot457, 0x000000000000000000000000000000000000abcd000000000000000062d68ebe);
+        bytes32 slot458 = vm.load(address(FRPVaultProxy), bytes32(uint256(458)));
+        assertEq(slot458, 0x000000000000000000000000000000000000abcd000000000000000062d68ebe);
     }
 
     // Internal helper functions for setting-up the system

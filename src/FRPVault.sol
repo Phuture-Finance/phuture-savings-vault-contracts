@@ -49,7 +49,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
     /// @inheritdoc IFRPVault
     IWrappedfCashFactory public wrappedfCashFactory;
     /// @notice 3 and 6 months maturities
-    address[] internal fCashPositions;
+    address[2] internal fCashPositions;
 
     /// @notice Timestamp of last AUM fee charge
     uint96 internal lastTransferTime;
@@ -99,7 +99,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
 
         address lowestYieldFCash = _wrappedfCashFactory.deployWrapper(_currencyId, uint40(lowestYieldMaturity));
         address highestYieldFCash = _wrappedfCashFactory.deployWrapper(_currencyId, uint40(highestYieldMaturity));
-        fCashPositions = new address[](SUPPORTED_MATURITIES);
+
         fCashPositions[0] = lowestYieldFCash;
         fCashPositions[1] = highestYieldFCash;
         IERC20Upgradeable(_asset).safeApprove(highestYieldFCash, type(uint).max);
@@ -150,7 +150,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
         // determine the burning fee on top of the estimated shares for withdrawing the exact asset output
         // cannot use the previewWithdraw since it already accounts for the burning fee
         uint fee = _chargeBurningFee(shares, _owner);
-        // burn shares
+        // burn shares, shares accounting for the fees are not burned since they are transferred to the feeRecipient
         _withdraw(msg.sender, _receiver, _owner, _assets, shares);
         // returns the shares plus fee
         return shares + fee;
@@ -447,5 +447,5 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
         require(hasRole(VAULT_MANAGER_ROLE, msg.sender), "FRPVault: FORBIDDEN");
     }
 
-    uint256[46] private __gap;
+    uint256[45] private __gap;
 }
