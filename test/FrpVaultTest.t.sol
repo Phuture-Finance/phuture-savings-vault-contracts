@@ -14,7 +14,7 @@ import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/IERC20Upgradeab
 import "./mocks/MockFrpVault.sol";
 import "../src/FRPVault.sol";
 import "openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import "../src/IFRPVault.sol";
+import "../src/interfaces/IFRPVault.sol";
 
 contract FrpVaultTest is Test {
     using stdStorage for StdStorage;
@@ -374,7 +374,7 @@ contract FrpVaultTest is Test {
         // https://eips.ethereum.org/EIPS/eip-4626#maxwithdraw => MUST return the maximum amount of assets that could be transferred from owner
         // through withdraw and not cause a revert, which MUST NOT be higher than the actual maximum that would be accepted
         // (it should underestimate if necessary).
-        assertEq(FRPVaultProxy.balanceOf(usdcWhale), 10006060758);
+        assertEq(FRPVaultProxy.balanceOf(usdcWhale), 10006060757);
         assertEq(sharesBurned, shares);
         assertEq(usdc.balanceOf(usdcWhale) - balanceOfUsdcBefore, maxAssetAmount);
 
@@ -392,6 +392,7 @@ contract FrpVaultTest is Test {
 
         // Initial deposit
         FRPVaultProxy.deposit(1e6, usdcWhale);
+        FRPVaultProxy.harvest(type(uint).max);
         uint sharesInitialDeposit = FRPVaultProxy.balanceOf(usdcWhale);
         uint feeRecipientBalanceBefore = FRPVaultProxy.balanceOf(feeRecipient);
         uint usdcBalanceBefore = usdc.balanceOf(usdcWhale);
@@ -418,14 +419,15 @@ contract FrpVaultTest is Test {
         vm.stopPrank();
     }
 
-    function testMint() public {
-        uint shares = 100_000 * 1e18 + 1;
+    function testMintFuzzing(uint shares) public {
+        vm.assume(shares < 100_000 * 1e6 && shares > 1);
 
         vm.startPrank(usdcWhale);
         usdc.approve(address(FRPVaultProxy), type(uint).max);
 
-        // Initial deposit
+        // Initial deposit/harvest
         FRPVaultProxy.deposit(1e6, usdcWhale);
+        FRPVaultProxy.harvest(type(uint).max);
         uint feeRecipientBalanceBefore = FRPVaultProxy.balanceOf(feeRecipient);
         uint sharesBalanceBefore = FRPVaultProxy.balanceOf(usdcWhale);
 
@@ -434,19 +436,17 @@ contract FrpVaultTest is Test {
         uint assetsEstimated = FRPVaultProxy.previewMint(shares);
 
         uint assetsWithoutFee = FRPVaultProxy.convertToAssets(shares);
-        uint mintingFee = FRPVaultProxy.convertToShares(
-            (assetsWithoutFee * FRPVaultProxy.MINTING_FEE_IN_BP()) / 10_000
-        );
+        uint mintingFee = (shares * FRPVaultProxy.MINTING_FEE_IN_BP()) / 10_000;
         uint aumFee = FRPVaultProxy.getAUMFee(blockTimestamp + 1_000);
 
         // deposit to assert
         uint assetsTransferred = FRPVaultProxy.mint(shares, usdcWhale);
 
         // minter transferred usdc and received exact number of shares
-        // https://eips.ethereum.org/EIPS/eip-4626#previewmint => discrepancy in 1 is ok. previewMint MUST return
+        // https://eips.ethereum.org/EIPS/eip-4626#previewmint => small discrepancy is ok. previewMint MUST return
         // as close to and no fewer than the exact amount of assets that would be deposited in a mint call in the same transaction.
         //I.e. mint should return the same or fewer assets as previewMint if called in the same transaction.
-        assertEq(assetsTransferred, assetsEstimated - 1);
+        assertLt(assetsEstimated - assetsTransferred, 5);
         assertEq(FRPVaultProxy.balanceOf(usdcWhale) - sharesBalanceBefore, shares);
 
         // aum fee is newly minted, minting fee is added on top of shares amount

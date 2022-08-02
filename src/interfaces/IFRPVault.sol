@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.13;
 
-import "./notional/interfaces/IWrappedfCashFactory.sol";
-import { IWrappedfCashComplete } from "./notional/interfaces/IWrappedfCash.sol";
+import "../notional/interfaces/IWrappedfCashFactory.sol";
+import { IWrappedfCashComplete } from "../notional/interfaces/IWrappedfCash.sol";
 
 /// @title Fixed rate product vault interface
 /// @notice Describes functions for integration with Notional

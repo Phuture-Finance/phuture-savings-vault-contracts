@@ -10,6 +10,7 @@ import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC4
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/IERC20Upgradeable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/security/ReentrancyGuardUpgradeable.sol";
+import "openzeppelin-contracts-upgradeable/contracts/utils/math/MathUpgradeable.sol";
 import "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 import { NotionalViews, MarketParameters } from "./notional/interfaces/INotional.sol";
@@ -17,13 +18,21 @@ import "./notional/interfaces/IWrappedfCashFactory.sol";
 import { IWrappedfCashComplete } from "./notional/interfaces/IWrappedfCash.sol";
 import "./notional/lib/Constants.sol";
 import "./notional/lib/DateTime.sol";
-import "./IFRPVault.sol";
+import "./interfaces/IFRPVault.sol";
 import "./libraries/AUMCalculationLibrary.sol";
 
 /// @title Fixed rate product vault
 /// @notice Contains logic for integration with Notional
-contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, AccessControlUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+contract FRPVault is
+    IFRPVault,
+    ERC4626Upgradeable,
+    ERC20PermitUpgradeable,
+    AccessControlUpgradeable,
+    UUPSUpgradeable,
+    ReentrancyGuardUpgradeable
+{
     using SafeERC20Upgradeable for IERC20Upgradeable;
+    using MathUpgradeable for uint256;
 
     /// @notice Responsible for all vault related permissions
     bytes32 internal constant VAULT_ADMIN_ROLE = keccak256("VAULT_ADMIN_ROLE");
@@ -147,7 +156,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
     ) public override returns (uint256) {
         require(_assets <= maxWithdraw(_owner), "FRPVault: withdraw more than max");
         // determine the amount of shares for the assets without the fees
-        uint shares = convertToShares(_assets);
+        uint shares = _convertToShares(_assets, MathUpgradeable.Rounding.Up);
         // determine the burning fee on top of the estimated shares for withdrawing the exact asset output
         // cannot use the previewWithdraw since it already accounts for the burning fee
         uint fee = _chargeBurningFee(shares, _owner);
@@ -177,7 +186,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
     function mint(uint256 _shares, address receiver) public override returns (uint256) {
         require(_shares <= maxMint(receiver), "FRPVault: mint more than max");
 
-        uint256 assets = convertToAssets(_shares);
+        uint256 assets = _convertToAssets(_shares, MathUpgradeable.Rounding.Up);
 
         uint fee = (_shares * MINTING_FEE_IN_BP) / BP;
         uint feeInAssets = convertToAssets(fee);
@@ -208,7 +217,7 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
 
     /// @inheritdoc IERC4626Upgradeable
     function previewWithdraw(uint256 _assets) public view override returns (uint256) {
-        uint shares = convertToShares(_assets);
+        uint shares = super.previewWithdraw(_assets);
         uint burningFee = (shares * BURNING_FEE_IN_BP) / BP;
         // To withdraw asset amount on top of needed shares burning fee is added
         return shares + burningFee;
@@ -216,17 +225,14 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
 
     /// @inheritdoc IERC4626Upgradeable
     function previewRedeem(uint256 _shares) public view override returns (uint256) {
-        uint burningFee = (_shares * BURNING_FEE_IN_BP) / BP;
         // amount of assets received is reduced by the shares amount
-        return convertToAssets(_shares - burningFee);
+        return convertToAssets(_shares - (_shares * BURNING_FEE_IN_BP) / BP);
     }
 
     /// @inheritdoc ERC4626Upgradeable
     function previewMint(uint256 _shares) public view override returns (uint256) {
-        uint assets = super.previewMint(_shares);
-        uint mintingFee = (assets * MINTING_FEE_IN_BP) / BP;
         // While minting exact amount of shares user needs to transfer asset plus fees on top of those assets
-        return assets + mintingFee;
+        return super.previewMint(_shares + _shares * MINTING_FEE_IN_BP / BP);
     }
 
     /// @inheritdoc ERC4626Upgradeable
