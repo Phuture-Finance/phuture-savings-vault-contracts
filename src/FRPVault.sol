@@ -301,13 +301,14 @@ contract FRPVault is IFRPVault, ERC4626Upgradeable, ERC20PermitUpgradeable, Acce
             // For further details refer to Notional docs: https://docs.notional.finance/developer-documentation/how-to/lend-and-borrow-fcash/wrapped-fcash
             uint bufferAmount = 10**_asset.decimals() / 10**3;
             for (uint i = 0; i < SUPPORTED_MATURITIES; i++) {
-                uint assetBalanceBeforeRedeem = _asset.balanceOf(address(this));
-                uint amountNeeded = _assets + bufferAmount - assetBalanceBeforeRedeem;
                 IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions[i]);
                 uint fCashAmountAvailable = fCashPosition.balanceOf(address(this));
                 if (fCashAmountAvailable == 0) {
                     continue;
                 }
+                uint assetBalanceBeforeRedeem = _asset.balanceOf(address(this));
+                uint amountNeeded = _assets + bufferAmount - assetBalanceBeforeRedeem;
+
                 uint fCashAmountNeeded = fCashPosition.previewWithdraw(amountNeeded);
                 uint fCashAmountBurned = _redeemToUnderlying(fCashAmountAvailable, fCashAmountNeeded, fCashPosition);
 
