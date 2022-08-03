@@ -22,7 +22,7 @@ import "./interfaces/IFRPVault.sol";
 import "./libraries/AUMCalculationLibrary.sol";
 
 /// @title Fixed rate product vault
-/// @notice Contains logic for integration with Notional
+/// @notice Contains logic for integration with Notional protocol
 contract FRPVault is
     IFRPVault,
     ERC4626Upgradeable,
@@ -36,7 +36,7 @@ contract FRPVault is
 
     /// @notice Responsible for all vault related permissions
     bytes32 internal constant VAULT_ADMIN_ROLE = keccak256("VAULT_ADMIN_ROLE");
-    /// @notice Role for vault
+    /// @notice Role for vault management
     bytes32 internal constant VAULT_MANAGER_ROLE = keccak256("VAULT_MANAGER_ROLE");
     /// @notice Number of supported maturities
     uint8 internal constant SUPPORTED_MATURITIES = 2;
@@ -160,7 +160,7 @@ contract FRPVault is
         // determine the burning fee on top of the estimated shares for withdrawing the exact asset output
         // cannot use the previewWithdraw since it already accounts for the burning fee
         uint fee = _chargeBurningFee(shares, _owner);
-        // burn shares, shares accounting for the fees are not burned since they are transferred to the feeRecipient
+        // shares accounting for the fees are not burned since they are transferred to the feeRecipient
         _withdraw(msg.sender, _receiver, _owner, _assets, shares);
         // returns the shares plus fee
         return shares + fee;
