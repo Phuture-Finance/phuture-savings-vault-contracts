@@ -90,8 +90,8 @@ contract FrpVaultTest is Test {
         assertEq(positions[0], lowestYieldFCash);
         assertEq(positions[1], highestYieldFCash);
 
-        assertEq(usdc.allowance(address(FRPVaultProxy), lowestYieldFCash), type(uint).max);
-        assertEq(usdc.allowance(address(FRPVaultProxy), highestYieldFCash), type(uint).max);
+        assertEq(usdc.allowance(address(FRPVaultProxy), lowestYieldFCash), 0);
+        assertEq(usdc.allowance(address(FRPVaultProxy), highestYieldFCash), 0);
 
         // assert roles, since the FRPVault is deployed by the testing contract
         assertTrue(FRPVaultProxy.hasRole(FRPVaultProxy._VAULT_ADMIN_ROLE(), address(this)));
@@ -170,6 +170,7 @@ contract FrpVaultTest is Test {
         assertEq(FRPVaultProxy.totalAssets(), 999123917207);
         // fCash amount in the vault is according to wrappedfCash estimation
         assertEq(highestYieldFCash.balanceOf(address(FRPVaultProxy)), fCashAmount);
+        assertEq(usdc.allowance(address(FRPVaultProxy), address(highestYieldFCash)), 0);
 
         // Estimation with using previewDeposit does not work according to the standard
         // so there is some additional leftover of USDC in the vault.

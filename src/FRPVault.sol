@@ -112,8 +112,6 @@ contract FRPVault is
 
         fCashPositions[0] = lowestYieldFCash;
         fCashPositions[1] = highestYieldFCash;
-        IERC20Upgradeable(_asset).safeApprove(highestYieldFCash, type(uint).max);
-        IERC20Upgradeable(_asset).safeApprove(lowestYieldFCash, type(uint).max);
     }
 
     /// @inheritdoc IFRPVault
@@ -136,9 +134,10 @@ contract FRPVault is
         _sortfCashPositions(lowestYieldfCash, highestYieldfCash);
 
         uint fCashAmount = _convertAssetsTofCash(deposited, IWrappedfCashComplete(highestYieldfCash));
-        _safeApprove(_asset, highestYieldfCash, deposited);
 
+        IERC20Upgradeable(_asset).safeApprove(highestYieldfCash, deposited);
         IWrappedfCashComplete(highestYieldfCash).mintViaUnderlying(deposited, uint88(fCashAmount), address(this), 0);
+        IERC20Upgradeable(_asset).safeApprove(highestYieldfCash, 0);
         emit FCashMinted(IWrappedfCashComplete(highestYieldfCash), deposited, fCashAmount);
     }
 
@@ -354,21 +353,6 @@ contract FRPVault is
         ) {
             fCashPositions[0] = _lowestYieldfCash;
             fCashPositions[1] = _highestYieldfCash;
-        }
-    }
-
-    /// @notice Approves the `_spender` to spend `_requiredAllowance` of `_token`
-    /// @param _token Token address_msg
-    /// @param _spender Spender address
-    /// @param _requiredAllowance Required allowance
-    function _safeApprove(
-        address _token,
-        address _spender,
-        uint _requiredAllowance
-    ) internal {
-        uint allowance = IERC20Upgradeable(_token).allowance(address(this), _spender);
-        if (allowance < _requiredAllowance) {
-            IERC20Upgradeable(_token).safeIncreaseAllowance(_spender, type(uint256).max - allowance);
         }
     }
 
