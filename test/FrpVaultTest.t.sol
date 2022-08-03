@@ -1,12 +1,13 @@
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.13;
 
 import "forge-std/Test.sol";
-import { MarketParameters, AssetRateAdapter, NotionalGovernance } from "../src/notional/interfaces/INotional.sol";
-import { IWrappedfCashComplete, IWrappedfCash } from "../src/notional/interfaces/IWrappedfCash.sol";
-import "../src/notional/proxy/nUpgradeableBeacon.sol";
-import "../src/notional/wfCashERC4626.sol";
-import "../src/interfaces/IWETH9.sol";
-import "../src/notional/proxy/WrappedfCashFactory.sol";
+import { MarketParameters, AssetRateAdapter, NotionalGovernance } from "../src/external/notional/interfaces/INotional.sol";
+import { IWrappedfCashComplete, IWrappedfCash } from "../src/external/notional/interfaces/IWrappedfCash.sol";
+import "../src/external/notional/proxy/nUpgradeableBeacon.sol";
+import "../src/external/notional/wfCashERC4626.sol";
+import "../src/external/interfaces/IWETH9.sol";
+import "../src/external/notional/proxy/WrappedfCashFactory.sol";
 import "openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "openzeppelin-contracts/contracts/utils/Address.sol";
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
@@ -435,7 +436,6 @@ contract FrpVaultTest is Test {
         vm.warp(blockTimestamp + 1_000);
         uint assetsEstimated = FRPVaultProxy.previewMint(shares);
 
-        uint assetsWithoutFee = FRPVaultProxy.convertToAssets(shares);
         uint mintingFee = (shares * FRPVaultProxy.MINTING_FEE_IN_BP()) / 10_000;
         uint aumFee = FRPVaultProxy.getAUMFee(blockTimestamp + 1_000);
 
@@ -594,7 +594,6 @@ contract FrpVaultTest is Test {
 
         // Next 3 slots are _balances, _allowances, _totalSupply mappings inside ERC20Upgradeable
         for (uint i = 51; i < 54; i++) {
-            bytes32 slot = vm.load(address(FRPVaultProxy), bytes32(uint256(i)));
             assertEq(load(cont, i), zeroValue);
         }
 

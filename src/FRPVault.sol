@@ -13,11 +13,11 @@ import "openzeppelin-contracts-upgradeable/contracts/security/ReentrancyGuardUpg
 import "openzeppelin-contracts-upgradeable/contracts/utils/math/MathUpgradeable.sol";
 import "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
-import { NotionalViews, MarketParameters } from "./notional/interfaces/INotional.sol";
-import "./notional/interfaces/IWrappedfCashFactory.sol";
-import { IWrappedfCashComplete } from "./notional/interfaces/IWrappedfCash.sol";
-import "./notional/lib/Constants.sol";
-import "./notional/lib/DateTime.sol";
+import { NotionalViews, MarketParameters } from "./external/notional/interfaces/INotional.sol";
+import "./external/notional/interfaces/IWrappedfCashFactory.sol";
+import { IWrappedfCashComplete } from "./external/notional/interfaces/IWrappedfCash.sol";
+import "./external/notional/lib/Constants.sol";
+import "./external/notional/lib/DateTime.sol";
 import "./interfaces/IFRPVault.sol";
 import "./libraries/AUMCalculationLibrary.sol";
 
@@ -232,7 +232,7 @@ contract FRPVault is
     /// @inheritdoc ERC4626Upgradeable
     function previewMint(uint256 _shares) public view override returns (uint256) {
         // While minting exact amount of shares user needs to transfer asset plus fees on top of those assets
-        return super.previewMint(_shares + _shares * MINTING_FEE_IN_BP / BP);
+        return super.previewMint(_shares + (_shares * MINTING_FEE_IN_BP) / BP);
     }
 
     /// @inheritdoc ERC4626Upgradeable

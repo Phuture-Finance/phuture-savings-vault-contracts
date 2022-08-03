@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: BUSL-1.1
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 pragma solidity 0.8.13;
 
-import "../notional/interfaces/IWrappedfCashFactory.sol";
-import { IWrappedfCashComplete } from "../notional/interfaces/IWrappedfCash.sol";
+import "../external/notional/interfaces/IWrappedfCashFactory.sol";
+import { IWrappedfCashComplete } from "../external/notional/interfaces/IWrappedfCash.sol";
 
 /// @title Fixed rate product vault interface
 /// @notice Describes functions for integration with Notional

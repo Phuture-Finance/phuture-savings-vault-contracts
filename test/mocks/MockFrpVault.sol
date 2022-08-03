@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity =0.8.13;
 
 import "../../src/FRPVault.sol";
 import "openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
-
-import "forge-std/console.sol";
 
 contract MockFrpVault is FRPVault {
     function _maxLoss() public view returns (uint16) {
