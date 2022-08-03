@@ -136,7 +136,7 @@ contract FRPVault is
         uint fCashAmount = _convertAssetsTofCash(deposited, IWrappedfCashComplete(highestYieldfCash));
 
         IERC20Upgradeable(_asset).safeApprove(highestYieldfCash, deposited);
-        IWrappedfCashComplete(highestYieldfCash).mintViaUnderlying(deposited, uint88(fCashAmount), address(this), 0);
+        IWrappedfCashComplete(highestYieldfCash).mintViaUnderlying(deposited, _safeUint88(fCashAmount), address(this), 0);
         IERC20Upgradeable(_asset).safeApprove(highestYieldfCash, 0);
         emit FCashMinted(IWrappedfCashComplete(highestYieldfCash), deposited, fCashAmount);
     }
@@ -432,6 +432,13 @@ contract FRPVault is
         fCashAmount = _highestYieldWrappedfCash.previewDeposit(_assetBalance);
         uint fCashAmountOracle = _highestYieldWrappedfCash.convertToShares(_assetBalance);
         require(fCashAmount >= (fCashAmountOracle * maxLoss) / BP, "FRPVault: PRICE_IMPACT");
+    }
+
+    /// @notice Safe downcast from uint256 to uint88
+    /// @param _x value to downcast
+    function _safeUint88(uint256 _x) internal view returns (uint88) {
+        require(_x <= uint256(type(uint88).max), "FRPVault: OVERFLOW");
+        return uint88(_x);
     }
 
     /// @inheritdoc UUPSUpgradeable
