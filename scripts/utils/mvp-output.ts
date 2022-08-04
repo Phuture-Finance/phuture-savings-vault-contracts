@@ -1,4 +1,5 @@
 import * as FrpVaultArtifact from '../../artifacts/src/FrpVault.sol/FrpVault.json'
+import * as wfCashBaseArtifact from '../../artifacts/src/external/notional/wfCashBase.sol/wfCashBase.json'
 
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -44,9 +45,9 @@ export interface DeploymentBlocks {
   FrpVaultBlockNumber?: number
 }
 
-const frontedArtifacts = [FrpVaultArtifact]
+const frontedArtifacts = [FrpVaultArtifact, wfCashBaseArtifact]
 
-const subgraphArtifacts = [FrpVaultArtifact]
+const subgraphArtifacts = [FrpVaultArtifact, wfCashBaseArtifact]
 
 export async function writeResults(addresses: DeploymentsAddresses, blocks: DeploymentBlocks): Promise<void> {
   createFolders()

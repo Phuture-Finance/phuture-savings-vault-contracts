@@ -71,12 +71,12 @@ async function main() {
   await transaction('FRPVault harvest', FRPVault, 'harvest', ethers.constants.MaxUint256)
 
   // admin, alice and bob harvest
-  await transaction('FRPVault withdraw', FRPVault, 'withdraw', expandTo6Decimals(500), admin.address, admin.address)
+  await transaction('FRPVault withdraw', FRPVault, 'withdraw', expandTo6Decimals(50), admin.address, admin.address)
   await transaction(
     'FRPVault withdraw',
     FRPVault.connect(alice),
     'withdraw',
-    expandTo6Decimals(100),
+    expandTo6Decimals(50),
     alice.address,
     alice.address
   )
@@ -84,7 +84,7 @@ async function main() {
     'FRPVault withdraw',
     FRPVault.connect(bob),
     'withdraw',
-    expandTo6Decimals(100),
+    expandTo6Decimals(50),
     bob.address,
     bob.address
   )
