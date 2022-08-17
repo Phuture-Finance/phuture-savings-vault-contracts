@@ -6,7 +6,7 @@ import "../external/notional/interfaces/IWrappedfCashFactory.sol";
 import { IWrappedfCashComplete } from "../external/notional/interfaces/IWrappedfCash.sol";
 
 /// @title Fixed rate product vault interface
-/// @notice Describes functions for integration with Notional
+/// @notice Describes functions for setting the vault state
 interface IFRPVault {
     struct NotionalMarket {
         uint maturity;
@@ -45,48 +45,8 @@ interface IFRPVault {
         address _feeRecipient
     ) external;
 
-    /// @notice Exchanges all the available assets into the highest yielding maturity
-    /// @param _maxDepositedAmount Max amount of asset to deposit to Notional
-    function harvest(uint _maxDepositedAmount) external;
-
     /// @notice Sets maxLoss
     /// @dev Max loss range is [0 - 10_000]
     /// @param _maxLoss Maximum loss allowed
     function setMaxLoss(uint16 _maxLoss) external;
-
-    /// @notice AUM scaled per seconds rate
-    /// @return Returns AUM scaled per seconds rate
-    function AUM_SCALED_PER_SECONDS_RATE() external view returns (uint);
-
-    /// @notice Minting fee in basis point format [0 - 10_000]
-    /// @return Returns minting fee in base point (BP) format
-    function MINTING_FEE_IN_BP() external view returns (uint);
-
-    /// @notice Burning fee in base point format [0 - 10_000]
-    /// @return Returns burning fee in base point (BP) format
-    function BURNING_FEE_IN_BP() external view returns (uint);
-
-    /// @notice Time required to pass between two harvest events
-    /// @return Returns timeout
-    function TIMEOUT() external view returns (uint);
-
-    /// @notice Currency id of asset on Notional
-    /// @return Returns currency id of the asset in the vault
-    function currencyId() external view returns (uint16);
-
-    /// @notice Address of Notional router
-    /// @return Returns address of main Notional router contract
-    function notionalRouter() external view returns (address);
-
-    /// @notice Address of wrappedfCash factory
-    /// @return Returns address of wrappedfCashFactory
-    function wrappedfCashFactory() external view returns (IWrappedfCashFactory);
-
-    /// @notice Timestamp of last harvest
-    /// @return Returns timestamp of last harvest
-    function lastHarvest() external view returns (uint96);
-
-    /// @notice Check if can harvest based on time passed
-    /// @return Returns true if can harvest
-    function canHarvest() external view returns (bool);
 }

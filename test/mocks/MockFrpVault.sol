@@ -25,8 +25,8 @@ contract MockFrpVault is FRPVault {
         return VAULT_MANAGER_ROLE;
     }
 
-    function _KEEPER_JOB_ROLE() public pure returns (bytes32) {
-        return KEEPER_JOB_ROLE;
+    function _HARVESTER_ROLE() public pure returns (bytes32) {
+        return HARVESTER_ROLE;
     }
 
     function _BP() public pure returns (uint16) {

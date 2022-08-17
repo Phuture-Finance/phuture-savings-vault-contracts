@@ -19,11 +19,15 @@ import { IWrappedfCashComplete } from "./external/notional/interfaces/IWrappedfC
 import "./external/notional/lib/Constants.sol";
 import "./interfaces/IFRPVault.sol";
 import "./libraries/AUMCalculationLibrary.sol";
+import "./interfaces/IFRPHarvester.sol";
+import "./interfaces/IFRPViewer.sol";
 
 /// @title Fixed rate product vault
 /// @notice Contains logic for integration with Notional protocol
 contract FRPVault is
     IFRPVault,
+    IFRPHarvester,
+    IFRPViewer,
     ERC4626Upgradeable,
     ERC20PermitUpgradeable,
     AccessControlUpgradeable,
@@ -38,30 +42,30 @@ contract FRPVault is
     /// @notice Role for vault management
     bytes32 internal constant VAULT_MANAGER_ROLE = keccak256("VAULT_MANAGER_ROLE");
     /// @notice Role for keep3r job contract
-    bytes32 internal constant KEEPER_JOB_ROLE = keccak256("KEEPER_JOB_ROLE");
+    bytes32 internal constant HARVESTER_ROLE = keccak256("HARVESTER_ROLE");
     /// @notice Number of supported maturities
     uint8 internal constant SUPPORTED_MATURITIES = 2;
     /// @notice Base point number
     uint16 internal constant BP = 10_000;
 
-    /// @inheritdoc IFRPVault
+    /// @inheritdoc IFRPViewer
     uint public constant AUM_SCALED_PER_SECONDS_RATE = 1000000000158946658547141217;
-    /// @inheritdoc IFRPVault
+    /// @inheritdoc IFRPViewer
     uint public constant MINTING_FEE_IN_BP = 20;
-    /// @inheritdoc IFRPVault
+    /// @inheritdoc IFRPViewer
     uint public constant BURNING_FEE_IN_BP = 20;
-    /// @inheritdoc IFRPVault
+    /// @inheritdoc IFRPHarvester
     uint public constant TIMEOUT = 86400;
 
-    /// @inheritdoc IFRPVault
+    /// @inheritdoc IFRPViewer
     uint16 public currencyId;
     /// @notice Maximum loss allowed during harvesting
     uint16 internal maxLoss;
-    /// @inheritdoc IFRPVault
+    /// @inheritdoc IFRPViewer
     address public notionalRouter;
-    /// @inheritdoc IFRPVault
+    /// @inheritdoc IFRPViewer
     IWrappedfCashFactory public wrappedfCashFactory;
-    /// @inheritdoc IFRPVault
+    /// @inheritdoc IFRPHarvester
     uint96 public lastHarvest;
     /// @notice 3 and 6 months maturities
     address[2] internal fCashPositions;
@@ -102,7 +106,7 @@ contract FRPVault is
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(VAULT_ADMIN_ROLE, msg.sender);
         _setRoleAdmin(VAULT_MANAGER_ROLE, VAULT_ADMIN_ROLE);
-        _setRoleAdmin(KEEPER_JOB_ROLE, VAULT_ADMIN_ROLE);
+        _setRoleAdmin(HARVESTER_ROLE, VAULT_ADMIN_ROLE);
 
         __ERC4626_init(IERC20MetadataUpgradeable(_asset));
         __ERC20_init(_name, _symbol);
@@ -126,8 +130,8 @@ contract FRPVault is
         fCashPositions[1] = highestYieldFCash;
     }
 
-    /// @inheritdoc IFRPVault
-    function harvest(uint _maxDepositedAmount) external nonReentrant onlyByRole(KEEPER_JOB_ROLE) {
+    /// @inheritdoc IFRPHarvester
+    function harvest(uint _maxDepositedAmount) external nonReentrant onlyByRole(HARVESTER_ROLE) {
         require(canHarvest(), "FRP:TIMEOUT");
         _redeemAssetsIfMarketMatured();
 
@@ -279,7 +283,7 @@ contract FRPVault is
         return assetBalance;
     }
 
-    /// @inheritdoc IFRPVault
+    /// @inheritdoc IFRPHarvester
     function canHarvest() public view returns (bool) {
         return block.timestamp - lastHarvest > TIMEOUT;
     }
@@ -457,15 +461,15 @@ contract FRPVault is
         require(fCashAmount >= (fCashAmountOracle * maxLoss) / BP, "FRPVault: PRICE_IMPACT");
     }
 
+    /// @inheritdoc UUPSUpgradeable
+    function _authorizeUpgrade(address _newImpl) internal view virtual override onlyByRole(VAULT_MANAGER_ROLE) {}
+
     /// @notice Safe downcast from uint256 to uint88
     /// @param _x value to downcast
-    function _safeUint88(uint256 _x) internal view returns (uint88) {
+    function _safeUint88(uint256 _x) internal pure returns (uint88) {
         require(_x <= uint256(type(uint88).max), "FRPVault: OVERFLOW");
         return uint88(_x);
     }
-
-    /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address _newImpl) internal view virtual override onlyByRole(VAULT_MANAGER_ROLE) {}
 
     uint256[45] private __gap;
 }

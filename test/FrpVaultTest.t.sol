@@ -71,8 +71,8 @@ contract FrpVaultTest is Test {
         // Default msg.sender inside all functions is: 0x00a329c0648769a73afac7f9381e08fb43dbea72,
         // msg.sender inside setUp is 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38
         FRPVaultProxy.grantRole(keccak256("VAULT_MANAGER_ROLE"), msg.sender);
-        FRPVaultProxy.grantRole(keccak256("KEEPER_JOB_ROLE"), msg.sender);
-        FRPVaultProxy.grantRole(keccak256("KEEPER_JOB_ROLE"), usdcWhale);
+        FRPVaultProxy.grantRole(keccak256("HARVESTER_ROLE"), msg.sender);
+        FRPVaultProxy.grantRole(keccak256("HARVESTER_ROLE"), usdcWhale);
     }
 
     function testInitialization() public {
@@ -101,8 +101,8 @@ contract FrpVaultTest is Test {
         // assert roles, since the FRPVault is deployed by the testing contract
         assertTrue(FRPVaultProxy.hasRole(FRPVaultProxy._VAULT_ADMIN_ROLE(), address(this)));
         assertTrue(FRPVaultProxy.hasRole(FRPVaultProxy._VAULT_MANAGER_ROLE(), setupMsgSender));
-        assertTrue(FRPVaultProxy.hasRole(FRPVaultProxy._KEEPER_JOB_ROLE(), setupMsgSender));
-        assertTrue(FRPVaultProxy.hasRole(FRPVaultProxy._KEEPER_JOB_ROLE(), usdcWhale));
+        assertTrue(FRPVaultProxy.hasRole(FRPVaultProxy._HARVESTER_ROLE(), setupMsgSender));
+        assertTrue(FRPVaultProxy.hasRole(FRPVaultProxy._HARVESTER_ROLE(), usdcWhale));
     }
 
     function testCannotInitializeWithInvalidMaxLoss() public {
@@ -551,7 +551,7 @@ contract FrpVaultTest is Test {
         );
         address daiWhale = address(0x5D38B4e4783E34e2301A2a36c39a03c45798C4dD);
         daiFRPVault.grantRole(keccak256("VAULT_MANAGER_ROLE"), msg.sender);
-        daiFRPVault.grantRole(keccak256("KEEPER_JOB_ROLE"), daiWhale);
+        daiFRPVault.grantRole(keccak256("HARVESTER_ROLE"), daiWhale);
 
         vm.startPrank(daiWhale);
         uint amount = 10_000 * 1e18;
