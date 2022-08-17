@@ -1,5 +1,5 @@
-import * as FrpVaultArtifact from '../../artifacts/src/FrpVault.sol/FrpVault.json'
 import * as wfCashBaseArtifact from '../../artifacts/src/external/notional/wfCashBase.sol/wfCashBase.json'
+import * as FrpVaultArtifact from '../../artifacts/src/FrpVault.sol/FrpVault.json'
 
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'

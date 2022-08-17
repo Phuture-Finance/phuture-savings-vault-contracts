@@ -66,6 +66,10 @@ interface IFRPVault {
     /// @return Returns burning fee in base point (BP) format
     function BURNING_FEE_IN_BP() external view returns (uint);
 
+    /// @notice Time required to pass between two harvest events
+    /// @return Returns timeout
+    function TIMEOUT() external view returns (uint);
+
     /// @notice Currency id of asset on Notional
     /// @return Returns currency id of the asset in the vault
     function currencyId() external view returns (uint16);
@@ -77,4 +81,12 @@ interface IFRPVault {
     /// @notice Address of wrappedfCash factory
     /// @return Returns address of wrappedfCashFactory
     function wrappedfCashFactory() external view returns (IWrappedfCashFactory);
+
+    /// @notice Timestamp of last harvest
+    /// @return Returns timestamp of last harvest
+    function lastHarvest() external view returns (uint96);
+
+    /// @notice Check if can harvest based on time passed
+    /// @return Returns true if can harvest
+    function canHarvest() external view returns (bool);
 }

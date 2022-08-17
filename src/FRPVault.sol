@@ -17,7 +17,6 @@ import { NotionalViews, MarketParameters } from "./external/notional/interfaces/
 import "./external/notional/interfaces/IWrappedfCashFactory.sol";
 import { IWrappedfCashComplete } from "./external/notional/interfaces/IWrappedfCash.sol";
 import "./external/notional/lib/Constants.sol";
-import "./external/notional/lib/DateTime.sol";
 import "./interfaces/IFRPVault.sol";
 import "./libraries/AUMCalculationLibrary.sol";
 
@@ -38,6 +37,8 @@ contract FRPVault is
     bytes32 internal constant VAULT_ADMIN_ROLE = keccak256("VAULT_ADMIN_ROLE");
     /// @notice Role for vault management
     bytes32 internal constant VAULT_MANAGER_ROLE = keccak256("VAULT_MANAGER_ROLE");
+    /// @notice Role for keep3r job contract
+    bytes32 internal constant KEEPER_JOB_ROLE = keccak256("KEEPER_JOB_ROLE");
     /// @notice Number of supported maturities
     uint8 internal constant SUPPORTED_MATURITIES = 2;
     /// @notice Base point number
@@ -49,6 +50,8 @@ contract FRPVault is
     uint public constant MINTING_FEE_IN_BP = 20;
     /// @inheritdoc IFRPVault
     uint public constant BURNING_FEE_IN_BP = 20;
+    /// @inheritdoc IFRPVault
+    uint public constant TIMEOUT = 86400;
 
     /// @inheritdoc IFRPVault
     uint16 public currencyId;
@@ -58,6 +61,8 @@ contract FRPVault is
     address public notionalRouter;
     /// @inheritdoc IFRPVault
     IWrappedfCashFactory public wrappedfCashFactory;
+    /// @inheritdoc IFRPVault
+    uint96 public lastHarvest;
     /// @notice 3 and 6 months maturities
     address[2] internal fCashPositions;
 
@@ -69,6 +74,12 @@ contract FRPVault is
     /// @notice Checks if max loss is within an acceptable range
     modifier isValidMaxLoss(uint16 _maxLoss) {
         require(_maxLoss <= BP, "FRPVault: MAX_LOSS");
+        _;
+    }
+
+    /// @notice Checks if msg.sender has the given role's permission
+    modifier onlyByRole(bytes32 role) {
+        require(hasRole(role, msg.sender), "FRPVault: FORBIDDEN");
         _;
     }
 
@@ -91,6 +102,7 @@ contract FRPVault is
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(VAULT_ADMIN_ROLE, msg.sender);
         _setRoleAdmin(VAULT_MANAGER_ROLE, VAULT_ADMIN_ROLE);
+        _setRoleAdmin(KEEPER_JOB_ROLE, VAULT_ADMIN_ROLE);
 
         __ERC4626_init(IERC20MetadataUpgradeable(_asset));
         __ERC20_init(_name, _symbol);
@@ -115,7 +127,8 @@ contract FRPVault is
     }
 
     /// @inheritdoc IFRPVault
-    function harvest(uint _maxDepositedAmount) external nonReentrant {
+    function harvest(uint _maxDepositedAmount) external nonReentrant onlyByRole(KEEPER_JOB_ROLE) {
+        require(canHarvest(), "FRP:TIMEOUT");
         _redeemAssetsIfMarketMatured();
 
         address _asset = asset();
@@ -136,14 +149,19 @@ contract FRPVault is
         uint fCashAmount = _convertAssetsTofCash(deposited, IWrappedfCashComplete(highestYieldfCash));
 
         IERC20Upgradeable(_asset).safeApprove(highestYieldfCash, deposited);
-        IWrappedfCashComplete(highestYieldfCash).mintViaUnderlying(deposited, _safeUint88(fCashAmount), address(this), 0);
+        IWrappedfCashComplete(highestYieldfCash).mintViaUnderlying(
+            deposited,
+            _safeUint88(fCashAmount),
+            address(this),
+            0
+        );
         IERC20Upgradeable(_asset).safeApprove(highestYieldfCash, 0);
+        lastHarvest = uint96(block.timestamp);
         emit FCashMinted(IWrappedfCashComplete(highestYieldfCash), deposited, fCashAmount);
     }
 
     /// @inheritdoc IFRPVault
-    function setMaxLoss(uint16 _maxLoss) external isValidMaxLoss(_maxLoss) {
-        require(hasRole(VAULT_MANAGER_ROLE, msg.sender), "FRPVault: FORBIDDEN");
+    function setMaxLoss(uint16 _maxLoss) external onlyByRole(VAULT_MANAGER_ROLE) isValidMaxLoss(_maxLoss) {
         maxLoss = _maxLoss;
     }
 
@@ -259,6 +277,11 @@ contract FRPVault is
             }
         }
         return assetBalance;
+    }
+
+    /// @inheritdoc IFRPVault
+    function canHarvest() public view returns (bool) {
+        return block.timestamp - lastHarvest > TIMEOUT;
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -442,9 +465,7 @@ contract FRPVault is
     }
 
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address _newImpl) internal view virtual override {
-        require(hasRole(VAULT_MANAGER_ROLE, msg.sender), "FRPVault: FORBIDDEN");
-    }
+    function _authorizeUpgrade(address _newImpl) internal view virtual override onlyByRole(VAULT_MANAGER_ROLE) {}
 
     uint256[45] private __gap;
 }
