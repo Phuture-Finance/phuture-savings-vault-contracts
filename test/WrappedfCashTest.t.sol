@@ -28,10 +28,13 @@ contract WrappedfCashTest is Test {
         vm.startPrank(usdcWhale);
         mainnetHttpsUrl = vm.envString("MAINNET_HTTPS_URL");
         mainnetFork = vm.createSelectFork(mainnetHttpsUrl, 15_364_981);
-
         MarketParameters[] memory marketParameters = NotionalViews(notionalRouter).getActiveMarkets(currencyId);
         uint maturity = marketParameters[0].maturity;
-        IWrappedfCashComplete fCash = IWrappedfCashComplete(IWrappedfCashFactory(wrappedfCashFactory).deployWrapper(currencyId, uint40(maturity)));
+        console.log("oracleRate is: ", marketParameters[0].oracleRate);
+        console.log("spot rate is: ", marketParameters[0].lastImpliedRate);
+        IWrappedfCashComplete fCash = IWrappedfCashComplete(
+            IWrappedfCashFactory(wrappedfCashFactory).deployWrapper(currencyId, uint40(maturity))
+        );
         usdc.approve(address(fCash), type(uint).max);
 
         uint assetsToDeposit = 100_000 * 1e6;
@@ -41,11 +44,13 @@ contract WrappedfCashTest is Test {
         uint withdrawAmount = 90_000 * 1e6;
         uint shares = fCash.previewWithdraw(withdrawAmount);
         // I have tried using both redeem and redeemToUnderlying and they return the same result
-//        fCash.redeem(shares, usdcWhale, usdcWhale);
+        //        fCash.redeem(shares, usdcWhale, usdcWhale);
         fCash.redeemToUnderlying(shares, usdcWhale, type(uint32).max);
         uint usdcBalanceAfter = usdc.balanceOf(usdcWhale);
         uint netUsdcBalance = usdcBalanceAfter - usdcBalanceBefore;
         console.log("amount underestimated is: ", withdrawAmount - netUsdcBalance); // This should return 37
+        console.log("amount requested is: ", withdrawAmount);
+        console.log("amount actually recieved is: ", netUsdcBalance);
         vm.stopPrank();
     }
 }

@@ -41,15 +41,11 @@ contract MockFrpVault is FRPVault {
         return positions;
     }
 
-    function __convertAssetsTofCash(uint _assetBalance, IWrappedfCashComplete _highestYieldWrappedfCash)
+    function __sortMarketsByOracleRate()
         public
         view
-        returns (uint fCashAmount)
+        returns (NotionalMarket memory lowestYieldMarket, NotionalMarket memory highestYieldMarket)
     {
-        return _convertAssetsTofCash(_assetBalance, _highestYieldWrappedfCash);
-    }
-
-    function __sortMarketsByOracleRate() public view returns (uint lowestYieldMaturity, uint highestYieldMaturity) {
         return _sortMarketsByOracleRate();
     }
 
