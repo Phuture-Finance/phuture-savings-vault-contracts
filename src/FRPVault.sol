@@ -375,7 +375,7 @@ contract FRPVault is
 
                 uint fCashAmountNeeded = fCashPosition.previewWithdraw(amountNeeded);
                 uint32 _oracleRate = sortedfCashPositions[i].oracleRate;
-                uint32 maxImpliedRate = _oracleRate != type(uint32).max ? sortedfCashPositions[i].oracleRate * ((2 * BP - maxLoss) / BP) : type(uint32).max;
+                uint32 maxImpliedRate = _oracleRate != type(uint32).max ? _oracleRate * ((2 * BP - maxLoss) / BP) : type(uint32).max;
                 uint fCashAmountBurned = _redeemToUnderlying(
                     fCashAmountAvailable,
                     fCashAmountNeeded,
