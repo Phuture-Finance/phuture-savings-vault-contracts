@@ -6,7 +6,10 @@
     "esModuleInterop": true,
     "outDir": "dist",
     "declaration": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "paths": {
+      "@artifacts/*": ["artifacts/*"]
+    }
   },
   "include": ["./tasks", "./test", "./typechain-types", "utils"],
   "files": ["./hardhat.config.ts"]

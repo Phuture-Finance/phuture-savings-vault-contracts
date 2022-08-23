@@ -1,0 +1,26 @@
+{
+  "semi": false,
+  "trailingComma": "none",
+  "singleQuote": true,
+  "printWidth": 120,
+  "tabWidth": 2,
+  "arrowParens": "avoid",
+  "bracketSpacing": true,
+  "overrides": [
+    {
+      "files": "**.sol",
+      "options": {
+        "useTabs": false,
+        "tabWidth": 4,
+        "singleQuote": false,
+        "explicitTypes": "preserve"
+      }
+    },
+    {
+      "files": "**.json",
+      "options": {
+        "printWidth": 200
+      }
+    }
+  ]
+}
