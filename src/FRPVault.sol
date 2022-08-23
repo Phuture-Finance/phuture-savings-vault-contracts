@@ -178,6 +178,11 @@ contract FRPVault is
         maxLoss = _maxLoss;
     }
 
+    /// @inheritdoc IFRPViewer
+    function getfCashPositions() external view returns (address[2] memory) {
+        return fCashPositions;
+    }
+
     /// @inheritdoc IERC4626Upgradeable
     function withdraw(
         uint256 _assets,
@@ -311,11 +316,6 @@ contract FRPVault is
     /// @inheritdoc IFRPHarvester
     function canHarvest() public view returns (bool) {
         return block.timestamp - lastHarvest > TIMEOUT;
-    }
-
-    /// @inheritdoc IFRPViewer
-    function getfCashPositions() external view returns (address[2] memory) {
-        return fCashPositions;
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -462,21 +462,6 @@ contract FRPVault is
         return sorted;
     }
 
-    /// @notice Fetches market parameters from Notional
-    /// @param _fCash to fetch market parameters
-    function _getNotionalMarketParameters(address _fCash)
-        internal
-        view
-        returns (MarketParameters memory marketParameters)
-    {
-        uint256 settlementDate = DateTime.getReferenceTime(block.timestamp) + Constants.QUARTER;
-        marketParameters = NotionalViews(notionalRouter).getMarket(
-            currencyId,
-            IWrappedfCashComplete(_fCash).getMaturity(),
-            settlementDate
-        );
-    }
-
     /// @notice Sorts fCash positions in case there was a change with respect to the previous state
     function _sortfCashPositions(address _lowestYieldfCash, address _highestYieldfCash) internal {
         if (
@@ -504,6 +489,21 @@ contract FRPVault is
                 lastTransferTime = uint96(block.timestamp);
             }
         }
+    }
+
+    /// @notice Fetches market parameters from Notional
+    /// @param _fCash to fetch market parameters
+    function _getNotionalMarketParameters(address _fCash)
+        internal
+        view
+        returns (MarketParameters memory marketParameters)
+    {
+        uint256 settlementDate = DateTime.getReferenceTime(block.timestamp) + Constants.QUARTER;
+        marketParameters = NotionalViews(notionalRouter).getMarket(
+            currencyId,
+            IWrappedfCashComplete(_fCash).getMaturity(),
+            settlementDate
+        );
     }
 
     /// @notice Gets the three and six months markets from Notional

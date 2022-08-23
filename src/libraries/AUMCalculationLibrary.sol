@@ -7,7 +7,7 @@ pragma solidity 0.8.13;
 /// @dev Taken from https://github.com/enzymefinance/protocol
 library AUMCalculationLibrary {
     /// @dev A constant used for AUM fee calculation to prevent underflow
-    uint constant RATE_SCALE_BASE = 1e27;
+    uint public constant RATE_SCALE_BASE = 1e27;
 
     /// @notice Power function for AUM fee calculation
     /// @param _x Base number
