@@ -314,7 +314,7 @@ contract FRPVault is
     }
 
     /// @inheritdoc IFRPViewer
-    function getfCashPositions() public view returns (address[2] memory) {
+    function getfCashPositions() external view returns (address[2] memory) {
         return fCashPositions;
     }
 
