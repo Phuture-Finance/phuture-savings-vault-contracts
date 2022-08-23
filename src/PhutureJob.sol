@@ -3,10 +3,10 @@
 pragma solidity 0.8.13;
 
 import "openzeppelin-contracts/contracts/security/Pausable.sol";
+import "openzeppelin-contracts/contracts/access/Ownable.sol";
 
 import "./interfaces/IKeeper3r.sol";
 import "./external/interfaces/IKeep3r.sol";
-import "openzeppelin-contracts/contracts/access/Ownable.sol";
 import "./interfaces/IHarvestingJob.sol";
 import "./interfaces/IFRPHarvester.sol";
 

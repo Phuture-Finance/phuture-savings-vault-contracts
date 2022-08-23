@@ -82,12 +82,6 @@ contract FRPVault is
         _;
     }
 
-    /// @notice Checks if msg.sender has the given role's permission
-    modifier onlyByRole(bytes32 role) {
-        require(hasRole(role, msg.sender), "FRPVault: FORBIDDEN");
-        _;
-    }
-
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -139,7 +133,7 @@ contract FRPVault is
     }
 
     /// @inheritdoc IFRPHarvester
-    function harvest(uint _maxDepositedAmount) external nonReentrant onlyByRole(HARVESTER_ROLE) {
+    function harvest(uint _maxDepositedAmount) external nonReentrant onlyRole(HARVESTER_ROLE) {
         require(canHarvest(), "FRP:TIMEOUT");
         _redeemAssetsIfMarketMatured();
 
@@ -180,7 +174,7 @@ contract FRPVault is
     }
 
     /// @inheritdoc IFRPVault
-    function setMaxLoss(uint16 _maxLoss) external onlyByRole(VAULT_MANAGER_ROLE) isValidMaxLoss(_maxLoss) {
+    function setMaxLoss(uint16 _maxLoss) external onlyRole(VAULT_MANAGER_ROLE) isValidMaxLoss(_maxLoss) {
         maxLoss = _maxLoss;
     }
 
@@ -319,6 +313,11 @@ contract FRPVault is
         return block.timestamp - lastHarvest > TIMEOUT;
     }
 
+    /// @inheritdoc IFRPViewer
+    function getfCashPositions() public view returns (address[2] memory) {
+        return fCashPositions;
+    }
+
     /// @inheritdoc ERC4626Upgradeable
     function _withdraw(
         address _caller,
@@ -375,7 +374,9 @@ contract FRPVault is
 
                 uint fCashAmountNeeded = fCashPosition.previewWithdraw(amountNeeded);
                 uint32 _oracleRate = sortedfCashPositions[i].oracleRate;
-                uint32 maxImpliedRate = _oracleRate != type(uint32).max ? _oracleRate * ((2 * BP - maxLoss) / BP) : type(uint32).max;
+                uint32 maxImpliedRate = _oracleRate != type(uint32).max
+                    ? _oracleRate * ((2 * BP - maxLoss) / BP)
+                    : type(uint32).max;
                 uint fCashAmountBurned = _redeemToUnderlying(
                     fCashAmountAvailable,
                     fCashAmountNeeded,
@@ -544,7 +545,7 @@ contract FRPVault is
     }
 
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address _newImpl) internal view virtual override onlyByRole(VAULT_MANAGER_ROLE) {}
+    function _authorizeUpgrade(address _newImpl) internal view virtual override onlyRole(VAULT_MANAGER_ROLE) {}
 
     /// @notice Safe downcast from uint256 to uint88
     /// @param _x value to downcast

@@ -30,4 +30,8 @@ interface IFRPViewer {
     /// @notice Address of wrappedfCash factory
     /// @return Returns address of wrappedfCashFactory
     function wrappedfCashFactory() external view returns (IWrappedfCashFactory);
+
+    /// @notice fCash positions that the vault has
+    /// @return Returns addresses of fCash positions that the vault has
+    function getfCashPositions() external view returns (address[2] memory);
 }

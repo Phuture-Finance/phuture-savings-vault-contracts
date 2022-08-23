@@ -152,7 +152,11 @@ contract FrpVaultTest is Test {
         vm.expectRevert(bytes("FRPVault: MAX_LOSS"));
         FRPVaultProxy.setMaxLoss(invalidMaxLoss);
 
-        vm.expectRevert(bytes("FRPVault: FORBIDDEN"));
+        vm.expectRevert(
+            bytes(
+                "AccessControl: account 0xb4c79dab8f259c7aee6e5b2aa729821864227e84 is missing role 0xd1473398bb66596de5d1ea1fc8e303ff2ac23265adc9144b1b52065dc4f0934b"
+            )
+        );
         FRPVaultProxy.setMaxLoss(9500);
     }
 
