@@ -2,11 +2,8 @@
 pragma solidity 0.8.13;
 
 import "forge-std/Test.sol";
-import { MarketParameters, AssetRateAdapter, NotionalGovernance } from "../src/external/notional/interfaces/INotional.sol";
+import { MarketParameters } from "../src/external/notional/interfaces/INotional.sol";
 import { IWrappedfCashComplete, IWrappedfCash } from "../src/external/notional/interfaces/IWrappedfCash.sol";
-import "../src/external/notional/proxy/nUpgradeableBeacon.sol";
-import "../src/external/notional/wfCashERC4626.sol";
-import "../src/external/interfaces/IWETH9.sol";
 import "../src/external/notional/proxy/WrappedfCashFactory.sol";
 import "openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "openzeppelin-contracts/contracts/utils/Address.sol";
@@ -14,8 +11,6 @@ import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeabl
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/IERC20Upgradeable.sol";
 import "./mocks/MockFrpVault.sol";
 import "../src/FRPVault.sol";
-import "openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import "../src/interfaces/IFRPVault.sol";
 import "../src/interfaces/IFRPVault.sol";
 
 contract FrpVaultTest is Test {
@@ -43,10 +38,12 @@ contract FrpVaultTest is Test {
 
     string mainnetHttpsUrl;
     uint mainnetFork;
+    uint blockNumber;
 
     function setUp() public {
         mainnetHttpsUrl = vm.envString("MAINNET_HTTPS_URL");
-        mainnetFork = vm.createSelectFork(mainnetHttpsUrl, 15_172_678);
+        blockNumber = 15_172_678;
+        mainnetFork = vm.createSelectFork(mainnetHttpsUrl, blockNumber);
 
         wrappedfCashFactory = address(0x5D051DeB5db151C2172dCdCCD42e6A2953E27261);
         feeRecipient = address(0xABCD);
@@ -84,7 +81,7 @@ contract FrpVaultTest is Test {
         assertEq(FRPVaultProxy.currencyId(), currencyId);
         assertEq(address(FRPVaultProxy.wrappedfCashFactory()), wrappedfCashFactory);
         assertEq(FRPVaultProxy.notionalRouter(), notionalRouter);
-        assertEq(FRPVaultProxy._maxLoss(), maxLoss);
+        assertEq(FRPVaultProxy.maxLoss(), maxLoss);
         assertEq(FRPVaultProxy._feeRecipient(), feeRecipient);
         assertEq(FRPVaultProxy._lastTransferTime(), block.timestamp);
         assertEq(FRPVaultProxy.lastHarvest(), 0);
@@ -143,7 +140,7 @@ contract FrpVaultTest is Test {
         uint16 newMaxLoss = 9500;
         vm.prank(setupMsgSender);
         FRPVaultProxy.setMaxLoss(newMaxLoss);
-        assertEq(FRPVaultProxy._maxLoss(), newMaxLoss);
+        assertEq(FRPVaultProxy.maxLoss(), newMaxLoss);
     }
 
     function testCannotSetMaxLoss() public {
@@ -330,7 +327,7 @@ contract FrpVaultTest is Test {
 
         uint shares = FRPVaultProxy.previewWithdraw(assetAmount);
         uint burningFee = shares -
-            ((shares * FRPVaultProxy._BP()) / (FRPVaultProxy.BURNING_FEE_IN_BP() + FRPVaultProxy._BP()));
+            ((shares * FRPVaultProxy.BP()) / (FRPVaultProxy.BURNING_FEE_IN_BP() + FRPVaultProxy.BP()));
         uint aumFee = FRPVaultProxy.getAUMFee(blockTimestamp + 1_000);
 
         uint feeRecipientBalanceBefore = FRPVaultProxy.balanceOf(feeRecipient);
@@ -370,7 +367,7 @@ contract FrpVaultTest is Test {
         uint assetBalanceBeforeRedeem = usdc.balanceOf(usdcWhale);
         uint feeRecipientBalanceBefore = FRPVaultProxy.balanceOf(feeRecipient);
         uint burningFee = maxShares -
-            ((maxShares * FRPVaultProxy._BP()) / (FRPVaultProxy.BURNING_FEE_IN_BP() + FRPVaultProxy._BP()));
+            ((maxShares * FRPVaultProxy.BP()) / (FRPVaultProxy.BURNING_FEE_IN_BP() + FRPVaultProxy.BP()));
         uint aumFee = FRPVaultProxy.getAUMFee(blockTimestamp + 1_000);
 
         assertEq(FRPVaultProxy.redeem(maxShares, usdcWhale, usdcWhale), assetAmount);
@@ -440,7 +437,7 @@ contract FrpVaultTest is Test {
 
         uint sharesWithoutFee = FRPVaultProxy.convertToShares(assets);
         uint mintingFee = (sharesWithoutFee * FRPVaultProxy.MINTING_FEE_IN_BP()) /
-            (FRPVaultProxy._BP() + FRPVaultProxy.MINTING_FEE_IN_BP());
+            (FRPVaultProxy.BP() + FRPVaultProxy.MINTING_FEE_IN_BP());
         uint aumFee = FRPVaultProxy.getAUMFee(blockTimestamp + 1_000);
 
         // deposit to assert
@@ -672,7 +669,7 @@ contract FrpVaultTest is Test {
         (
             IFRPVault.NotionalMarket memory lowestYieldMarket,
             IFRPVault.NotionalMarket memory highestYieldMarket
-        ) = FRPVaultProxy.__sortMarketsByOracleRate();
+        ) = FRPVaultProxy.sortMarketsByOracleRate();
 
         assertEq(lowestYieldMarket.maturity, threeMonthMaturity);
         assertEq(highestYieldMarket.maturity, sixMonthMaturity);
@@ -809,38 +806,6 @@ contract FrpVaultTest is Test {
             oracleRate: oracleRate,
             previousTradeTime: 1
         });
-    }
-
-    function upgradeNotionalProxy() internal {
-        address ownerAddress = nUpgradeableBeacon(notionalRouter).owner();
-        vm.startPrank(ownerAddress);
-        nUpgradeableBeacon(notionalRouter).upgradeTo(address(0x16eD130F7A6dcAc7e3B0617A7bafa4b470189962));
-        NotionalGovernance(notionalRouter).updateAssetRate(
-            1,
-            AssetRateAdapter(0x8E3D447eBE244db6D28E2303bCa86Ef3033CFAd6)
-        );
-        NotionalGovernance(notionalRouter).updateAssetRate(
-            2,
-            AssetRateAdapter(0x719993E82974f5b5eA0c5ebA25c260CD5AF78E00)
-        );
-        NotionalGovernance(notionalRouter).updateAssetRate(
-            3,
-            AssetRateAdapter(0x612741825ACedC6F88D8709319fe65bCB015C693)
-        );
-        NotionalGovernance(notionalRouter).updateAssetRate(
-            4,
-            AssetRateAdapter(0x39D9590721331B13C8e9A42941a2B961B513E69d)
-        );
-        vm.stopPrank();
-    }
-
-    function deployfCashFactory() internal returns (WrappedfCashFactory factory) {
-        wfCashERC4626 wfCashImpl = new wfCashERC4626(
-            INotionalV2(notionalRouter),
-            IWETH9(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)
-        );
-        nUpgradeableBeacon beacon = new nUpgradeableBeacon(address(wfCashImpl));
-        return new WrappedfCashFactory(address(beacon));
     }
 
     function load(address cont, uint position) internal returns (bytes32 slot) {

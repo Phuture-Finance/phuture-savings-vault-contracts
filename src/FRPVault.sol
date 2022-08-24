@@ -44,11 +44,11 @@ contract FRPVault is
     bytes32 internal constant VAULT_MANAGER_ROLE = keccak256("VAULT_MANAGER_ROLE");
     /// @notice Role for keep3r job contract
     bytes32 internal constant HARVESTER_ROLE = keccak256("HARVESTER_ROLE");
-    /// @notice Number of supported maturities
-    uint8 internal constant SUPPORTED_MATURITIES = 2;
-    /// @notice Base point number
-    uint16 internal constant BP = 10_000;
 
+    /// @inheritdoc IFRPViewer
+    uint8 public constant SUPPORTED_MATURITIES = 2;
+    /// @inheritdoc IFRPViewer
+    uint16 public constant BP = 10_000;
     /// @inheritdoc IFRPViewer
     uint public constant AUM_SCALED_PER_SECONDS_RATE = 1000000000158946658547141217;
     /// @inheritdoc IFRPViewer
@@ -60,8 +60,8 @@ contract FRPVault is
 
     /// @inheritdoc IFRPViewer
     uint16 public currencyId;
-    /// @notice Maximum loss allowed during harvesting and withdrawal
-    uint16 internal maxLoss;
+    /// @notice IFRPViewer
+    uint16 public maxLoss;
     /// @inheritdoc IFRPViewer
     address public notionalRouter;
     /// @inheritdoc IFRPViewer
@@ -117,10 +117,7 @@ contract FRPVault is
         feeRecipient = _feeRecipient;
         lastTransferTime = uint96(block.timestamp);
 
-        (
-            NotionalMarket memory lowestYieldMarket,
-            NotionalMarket memory highestYieldMarket
-        ) = _sortMarketsByOracleRate();
+        (NotionalMarket memory lowestYieldMarket, NotionalMarket memory highestYieldMarket) = sortMarketsByOracleRate();
 
         address lowestYieldFCash = _wrappedfCashFactory.deployWrapper(_currencyId, uint40(lowestYieldMarket.maturity));
         address highestYieldFCash = _wrappedfCashFactory.deployWrapper(
@@ -144,10 +141,7 @@ contract FRPVault is
         }
         uint deposited = Math.min(assetBalance, _maxDepositedAmount);
 
-        (
-            NotionalMarket memory lowestYieldMarket,
-            NotionalMarket memory highestYieldMarket
-        ) = _sortMarketsByOracleRate();
+        (NotionalMarket memory lowestYieldMarket, NotionalMarket memory highestYieldMarket) = sortMarketsByOracleRate();
 
         IWrappedfCashFactory _wrappedfCashFactory = wrappedfCashFactory;
         uint16 _currencyId = currencyId;
@@ -318,6 +312,24 @@ contract FRPVault is
         return block.timestamp - lastHarvest > TIMEOUT;
     }
 
+    /// @inheritdoc IFRPHarvester
+    function sortMarketsByOracleRate()
+        public
+        view
+        returns (NotionalMarket memory lowestYieldMarket, NotionalMarket memory highestYieldMarket)
+    {
+        NotionalMarket[] memory notionalMarkets = _getThreeAndSixMonthMarkets();
+        uint market0OracleRate = notionalMarkets[0].oracleRate;
+        uint market1OracleRate = notionalMarkets[1].oracleRate;
+        if (market0OracleRate < market1OracleRate) {
+            lowestYieldMarket = notionalMarkets[0];
+            highestYieldMarket = notionalMarkets[1];
+        } else {
+            lowestYieldMarket = notionalMarkets[1];
+            highestYieldMarket = notionalMarkets[0];
+        }
+    }
+
     /// @inheritdoc ERC4626Upgradeable
     function _withdraw(
         address _caller,
@@ -439,7 +451,7 @@ contract FRPVault is
             (
                 NotionalMarket memory lowestYieldMarket,
                 NotionalMarket memory highestYieldMarket
-            ) = _sortMarketsByOracleRate();
+            ) = sortMarketsByOracleRate();
             uint16 _currencyId = currencyId;
             IWrappedfCashFactory _wrappedfCashFactory = wrappedfCashFactory;
             address lowestYieldfCash = _wrappedfCashFactory.deployWrapper(
@@ -524,24 +536,6 @@ contract FRPVault is
         }
         require(marketCount == SUPPORTED_MATURITIES, "FRPVault: NOTIONAL_MARKETS");
         return markets;
-    }
-
-    /// @notice Sorts the markets in ascending order by their oracle rate
-    function _sortMarketsByOracleRate()
-        internal
-        view
-        returns (NotionalMarket memory lowestYieldMarket, NotionalMarket memory highestYieldMarket)
-    {
-        NotionalMarket[] memory notionalMarkets = _getThreeAndSixMonthMarkets();
-        uint market0OracleRate = notionalMarkets[0].oracleRate;
-        uint market1OracleRate = notionalMarkets[1].oracleRate;
-        if (market0OracleRate < market1OracleRate) {
-            lowestYieldMarket = notionalMarkets[0];
-            highestYieldMarket = notionalMarkets[1];
-        } else {
-            lowestYieldMarket = notionalMarkets[1];
-            highestYieldMarket = notionalMarkets[0];
-        }
     }
 
     /// @inheritdoc UUPSUpgradeable

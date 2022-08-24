@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.13;
 
+import "./IFRPVault.sol";
+
 /// @title Fixed rate product vault harvesting interface
 /// @notice Describes functions for harvesting logic
 interface IFRPHarvester {
@@ -20,4 +22,12 @@ interface IFRPHarvester {
     /// @notice Check if can harvest based on time passed
     /// @return Returns true if can harvest
     function canHarvest() external view returns (bool);
+
+    /// @notice fetches the latest 3 and 6 month active markets from Notional and sorts them based on oracle rate
+    /// @return lowestYieldMarket lowest yield market
+    /// @return highestYieldMarket highest yield market
+    function sortMarketsByOracleRate()
+        external
+        view
+        returns (IFRPVault.NotionalMarket memory lowestYieldMarket, IFRPVault.NotionalMarket memory highestYieldMarket);
 }

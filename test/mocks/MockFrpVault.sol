@@ -5,10 +5,6 @@ import "../../src/FRPVault.sol";
 import "openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
 
 contract MockFrpVault is FRPVault {
-    function _maxLoss() public view returns (uint16) {
-        return maxLoss;
-    }
-
     function _lastTransferTime() public view returns (uint96) {
         return lastTransferTime;
     }
@@ -29,24 +25,12 @@ contract MockFrpVault is FRPVault {
         return HARVESTER_ROLE;
     }
 
-    function _BP() public pure returns (uint16) {
-        return BP;
-    }
-
     function _fCashPositions() public view returns (address[] memory) {
         address[] memory positions = new address[](2);
         for (uint i = 0; i < 2; i++) {
             positions[i] = fCashPositions[i];
         }
         return positions;
-    }
-
-    function __sortMarketsByOracleRate()
-        public
-        view
-        returns (NotionalMarket memory lowestYieldMarket, NotionalMarket memory highestYieldMarket)
-    {
-        return _sortMarketsByOracleRate();
     }
 
     function __getThreeAndSixMonthMarkets() public view returns (NotionalMarket[] memory) {
