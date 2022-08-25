@@ -57,7 +57,7 @@ contract FRPViews is IFRPViews {
     }
 
     /// @inheritdoc IFRPViews
-    function canHarvestAmount(uint _amount, address _FRP) public view returns (bool canHarvest) {
+    function canHarvestAmount(uint _amount, address _FRP) public view returns (bool) {
         (, IFRPVault.NotionalMarket memory highestYieldMarket) = IFRPHarvester(_FRP).sortMarketsByOracleRate();
         IWrappedfCashFactory wrappedfCashFactory = IWrappedfCashFactory(IFRPViewer(_FRP).wrappedfCashFactory());
         IWrappedfCashComplete wrappedfCash = IWrappedfCashComplete(
@@ -65,11 +65,7 @@ contract FRPViews is IFRPViews {
         );
         uint fCashAmount = wrappedfCash.previewDeposit(_amount);
         uint fCashAmountOracle = wrappedfCash.convertToShares(_amount);
-        if (fCashAmount >= (fCashAmountOracle * IFRPViewer(_FRP).maxLoss()) / IFRPViewer(_FRP).BP()) {
-            canHarvest = true;
-        } else {
-            canHarvest = false;
-        }
+        return (fCashAmount >= (fCashAmountOracle * IFRPViewer(_FRP).maxLoss()) / IFRPViewer(_FRP).BP());
     }
 
     /// @inheritdoc IFRPViews
