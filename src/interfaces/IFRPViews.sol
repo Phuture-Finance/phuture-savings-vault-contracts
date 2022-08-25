@@ -9,7 +9,7 @@ import "./IFRPViewer.sol";
 interface IFRPViews {
     /// @notice Spot annual percentage yield(APY) of the FRP vault
     /// @param _FRP Address of the vault
-    /// @return Returns APY of the vault
+    /// @return Returns APY of the vault with the precision of 1,000,000,000 units i.e. 37264168 equals to 3.7264168%
     function getAPY(IFRPViewer _FRP) external view returns (uint);
 
     /// @notice Checks if vault can harvest max amount (asset in the vault + redeemed matured fCash)
