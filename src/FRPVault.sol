@@ -50,14 +50,14 @@ contract FRPVault is
     /// @inheritdoc IFRPViewer
     uint16 public constant BP = 10_000;
     /// @inheritdoc IFRPViewer
-    uint public constant AUM_SCALED_PER_SECONDS_RATE = 1000000000158946658547141217;
+    uint public constant AUM_SCALED_PER_SECONDS_RATE = 1000000000318694059332284764;
     /// @inheritdoc IFRPViewer
     uint public constant MINTING_FEE_IN_BP = 20;
     /// @inheritdoc IFRPViewer
-    uint public constant BURNING_FEE_IN_BP = 20;
-    /// @inheritdoc IFRPHarvester
-    uint public constant TIMEOUT = 86400;
+    uint public constant BURNING_FEE_IN_BP = 50;
 
+    /// @inheritdoc IFRPHarvester
+    uint32 public timeout;
     /// @inheritdoc IFRPViewer
     uint16 public currencyId;
     /// @notice IFRPViewer
@@ -96,7 +96,8 @@ contract FRPVault is
         IWrappedfCashFactory _wrappedfCashFactory,
         address _notionalRouter,
         uint16 _maxLoss,
-        address _feeRecipient
+        address _feeRecipient,
+        uint32 _timeout
     ) external initializer isValidMaxLoss(_maxLoss) {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(VAULT_ADMIN_ROLE, msg.sender);
@@ -116,6 +117,7 @@ contract FRPVault is
         maxLoss = _maxLoss;
         feeRecipient = _feeRecipient;
         lastTransferTime = uint96(block.timestamp);
+        timeout = _timeout;
 
         (NotionalMarket memory lowestYieldMarket, NotionalMarket memory highestYieldMarket) = sortMarketsByOracleRate();
 
@@ -170,6 +172,11 @@ contract FRPVault is
     /// @inheritdoc IFRPVault
     function setMaxLoss(uint16 _maxLoss) external onlyRole(VAULT_MANAGER_ROLE) isValidMaxLoss(_maxLoss) {
         maxLoss = _maxLoss;
+    }
+
+    /// @inheritdoc IFRPHarvester
+    function setTimeout(uint32 _timeout) external onlyRole(VAULT_MANAGER_ROLE) {
+        timeout = _timeout;
     }
 
     /// @inheritdoc IFRPViewer
@@ -309,7 +316,7 @@ contract FRPVault is
 
     /// @inheritdoc IFRPHarvester
     function canHarvest() public view returns (bool) {
-        return block.timestamp - lastHarvest > TIMEOUT;
+        return block.timestamp - lastHarvest > timeout;
     }
 
     /// @inheritdoc IFRPHarvester

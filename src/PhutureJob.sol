@@ -9,12 +9,17 @@ import "./interfaces/IKeeper3r.sol";
 import "./external/interfaces/IKeep3r.sol";
 import "./interfaces/IHarvestingJob.sol";
 import "./interfaces/IFRPHarvester.sol";
+import "./interfaces/IJobConfig.sol";
+import "./interfaces/IPhutureJob.sol";
 
 /// @title Phuture job
 /// @notice Contains harvesting execution logic through keeper network
-contract PhutureJob is IKeeper3r, IHarvestingJob, Pausable, Ownable {
+contract PhutureJob is IPhutureJob, IKeeper3r, IHarvestingJob, Pausable, Ownable {
     /// @inheritdoc IKeeper3r
     address public immutable override keep3r;
+
+    /// @inheritdoc IPhutureJob
+    address public override jobConfig;
 
     /// @notice Pays keeper for work
     modifier payKeeper(address _keeper) {
@@ -23,8 +28,9 @@ contract PhutureJob is IKeeper3r, IHarvestingJob, Pausable, Ownable {
         IKeep3r(keep3r).worked(_keeper);
     }
 
-    constructor(address _keep3r) {
+    constructor(address _keep3r, address _jobConfig) {
         keep3r = _keep3r;
+        jobConfig = _jobConfig;
         _pause();
     }
 
@@ -38,13 +44,13 @@ contract PhutureJob is IKeeper3r, IHarvestingJob, Pausable, Ownable {
         _unpause();
     }
 
+    /// @inheritdoc IPhutureJob
+    function setJobConfig(address _jobConfig) external onlyOwner {
+        jobConfig = _jobConfig;
+    }
+
     /// @inheritdoc IHarvestingJob
-    function harvest(uint _maxDepositedAmount, IFRPHarvester _vault)
-        external
-        override
-        whenNotPaused
-        payKeeper(msg.sender)
-    {
-        _vault.harvest(_maxDepositedAmount);
+    function harvest(IFRPHarvester _vault) external override whenNotPaused payKeeper(msg.sender) {
+        _vault.harvest(IJobConfig(jobConfig).getDepositedAmount(address(_vault)));
     }
 }

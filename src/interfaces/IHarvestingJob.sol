@@ -14,7 +14,6 @@ interface IHarvestingJob {
     function unpause() external;
 
     /// @notice Harvests from vault
-    /// @param _maxDepositedAmount Max amount of asset to deposit to Notional
     /// @param _vault Address of the FRPVault
-    function harvest(uint _maxDepositedAmount, IFRPHarvester _vault) external;
+    function harvest(IFRPHarvester _vault) external;
 }

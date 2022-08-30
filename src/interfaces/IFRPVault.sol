@@ -19,15 +19,15 @@ interface IFRPVault {
     }
 
     /// @dev Emitted when minting fCash during harvest
-    /// @param _fCashPosition    Address of wrappedFCash token
-    /// @param _assetAmount      Amount of asset spent
-    /// @param _fCashAmount      Amount of fCash minted
+    /// @param _fCashPosition Address of wrappedFCash token
+    /// @param _assetAmount Amount of asset spent
+    /// @param _fCashAmount Amount of fCash minted
     event FCashMinted(IWrappedfCashComplete indexed _fCashPosition, uint _assetAmount, uint _fCashAmount);
 
     /// @dev Emitted when redeeming fCash during withdrawal
-    /// @param _fCashPosition    Address of wrappedFCash token
-    /// @param _assetAmount      Amount of asset received
-    /// @param _fCashAmount      Amount of fCash redeemed / burned
+    /// @param _fCashPosition Address of wrappedFCash token
+    /// @param _assetAmount Amount of asset received
+    /// @param _fCashAmount Amount of fCash redeemed / burned
     event FCashRedeemed(IWrappedfCashComplete indexed _fCashPosition, uint _assetAmount, uint _fCashAmount);
 
     /// @notice Initializes FrpVault
@@ -39,6 +39,7 @@ interface IFRPVault {
     /// @param _notionalRouter Address of the deployed notional router
     /// @param _maxLoss Maximum loss allowed
     /// @param _feeRecipient Address of the feeRecipient
+    /// @param _timeout Timeout between two harvests
     function initialize(
         string memory _name,
         string memory _symbol,
@@ -47,7 +48,8 @@ interface IFRPVault {
         IWrappedfCashFactory _wrappedfCashFactory,
         address _notionalRouter,
         uint16 _maxLoss,
-        address _feeRecipient
+        address _feeRecipient,
+        uint32 _timeout
     ) external;
 
     /// @notice Sets maxLoss

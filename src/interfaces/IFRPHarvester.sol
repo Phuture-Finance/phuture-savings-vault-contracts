@@ -11,9 +11,13 @@ interface IFRPHarvester {
     /// @param _maxDepositedAmount Max amount of asset to deposit to Notional
     function harvest(uint _maxDepositedAmount) external;
 
+    /// @notice Sets timeout for harvesting
+    /// @param _timeout Time between two harvests
+    function setTimeout(uint32 _timeout) external;
+
     /// @notice Time required to pass between two harvest events
     /// @return Returns timeout
-    function TIMEOUT() external view returns (uint);
+    function timeout() external view returns (uint32);
 
     /// @notice Timestamp of last harvest
     /// @return Returns timestamp of last harvest

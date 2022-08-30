@@ -1,8 +1,9 @@
+import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
 import * as mainnetConfig from '../eth_mainnet.json'
 import { ERC1967Proxy__factory, ERC20Upgradeable__factory, FRPVault__factory } from '../typechain-types'
 import { expandTo18Decimals, expandTo6Decimals } from '../utils/helpers'
-import { VAULT_MANAGER_ROLE } from '../utils/roles'
+import { HARVESTER_ROLE, VAULT_MANAGER_ROLE } from '../utils/roles'
 import { deploy, logger, transaction } from './utils'
 import { DeploymentBlocks, DeploymentsAddresses, writeResults } from './utils/mvp-output'
 
@@ -10,6 +11,7 @@ async function main() {
   logger.logTitle('Frp deployment')
 
   const [admin, alice, bob] = await ethers.getSigners()
+  // console.log("admin is: ", admin.address)
 
   const USDC = ERC20Upgradeable__factory.connect(mainnetConfig.USDC, admin)
 
@@ -32,6 +34,11 @@ async function main() {
   FRPVault = FRPVault.attach(FRPVaultProxy.address)
 
   await transaction('Grant VAULT_MANAGER_ROLE', FRPVault, 'grantRole', VAULT_MANAGER_ROLE, admin.address)
+  await transaction('Grant HARVESTER_ROLE', FRPVault, 'grantRole', HARVESTER_ROLE, admin.address)
+
+  // const usdcWhale = await impersonate(mainnetConfig.whales.USDC)
+  // await setBalance(usdcWhale.address, expandTo18Decimals(1_000_000))
+  // await transaction('USDC transfer', USDC.connect(usdcWhale), 'transfer', admin.address, expandTo6Decimals(100_000))
 
   // Admin mints FRP
   const usdcAmount = expandTo6Decimals(1000)
@@ -47,7 +54,10 @@ async function main() {
   await transaction('USDC transfer', USDC, 'transfer', bob.address, expandTo6Decimals(100))
 
   // harvesting
-  await transaction('FRPVault harvest', FRPVault, 'harvest', ethers.constants.MaxUint256)
+  await FRPVault.connect(admin).harvest(ethers.constants.MaxUint256, {
+    gasPrice: BigNumber.from(200 * 10 ** 9),
+    gasLimit: BigNumber.from(10 * 10 ** 6)
+  })
 
   // alice and bob deposit their USDC
   await transaction(
@@ -68,7 +78,10 @@ async function main() {
   await transaction('FRPVault deposit', FRPVault.connect(bob), 'deposit', expandTo6Decimals(100), bob.address)
 
   // harvesting
-  await transaction('FRPVault harvest', FRPVault, 'harvest', ethers.constants.MaxUint256)
+  await FRPVault.connect(admin).harvest(ethers.constants.MaxUint256, {
+    gasPrice: BigNumber.from(200 * 10 ** 9),
+    gasLimit: BigNumber.from(10 * 10 ** 6)
+  })
 
   // admin, alice and bob harvest
   await transaction('FRPVault withdraw', FRPVault, 'withdraw', expandTo6Decimals(50), admin.address, admin.address)

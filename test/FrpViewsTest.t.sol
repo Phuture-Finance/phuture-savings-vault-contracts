@@ -61,7 +61,8 @@ contract FrpViewesTest is Test {
                         wrappedfCashFactory,
                         notionalRouter,
                         0,
-                        feeRecipient
+                        feeRecipient,
+                        1 days
                     )
                 )
             )
@@ -86,7 +87,7 @@ contract FrpViewesTest is Test {
 
         // apy after investing into first maturity
         assertEq(views.getAPY(FRPVaultProxy), 42173528);
-        vm.warp(block.timestamp + FRPVaultProxy.TIMEOUT() + 1);
+        vm.warp(block.timestamp + FRPVaultProxy.timeout() + 1);
 
         FRPVaultProxy.deposit(500 * 1e6, usdcWhale);
         IFRPVault.NotionalMarket[] memory markets = FRPVaultProxy.__getThreeAndSixMonthMarkets();
@@ -138,7 +139,7 @@ contract FrpViewesTest is Test {
     }
 
     function testCanHarvestAmount() public {
-        uint amount = 5_000_00 * 1e6;
+        uint amount = 500_000 * 1e6;
         FRPVaultProxy.setMaxLoss(9990);
         FRPVaultProxy.deposit(amount, usdcWhale);
         assertTrue(views.canHarvestAmount(amount / 8, address(FRPVaultProxy)));

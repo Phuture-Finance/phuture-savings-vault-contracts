@@ -61,7 +61,8 @@ contract FrpVaultTest is Test {
                         wrappedfCashFactory,
                         notionalRouter,
                         maxLoss,
-                        feeRecipient
+                        feeRecipient,
+                        1 days
                     )
                 )
             )
@@ -72,6 +73,14 @@ contract FrpVaultTest is Test {
         FRPVaultProxy.grantRole(keccak256("HARVESTER_ROLE"), msg.sender);
         FRPVaultProxy.grantRole(keccak256("HARVESTER_ROLE"), usdcWhale);
         FRPVaultProxy.grantRole(keccak256("VAULT_MANAGER_ROLE"), usdcWhale);
+    }
+
+    function testMainnetDeployment() public {
+        vm.createSelectFork(mainnetHttpsUrl);
+        FRPVault frp = FRPVault(0x5cE40e68C1A011c1782499bF5fF01C910c792Ba6);
+        address[2] memory positions = frp.getfCashPositions();
+        assertEq(positions[0], 0x69c6B313506684f49c564B48bF0E4d41c0Cb1A3e);
+        assertEq(positions[1], 0xF1e1a4213F241d8fE23990Fc16e14eAf37a27028);
     }
 
     function testInitialization() public {
@@ -132,7 +141,8 @@ contract FrpVaultTest is Test {
             IWrappedfCashFactory(wrappedfCashFactory),
             notionalRouter,
             9800,
-            feeRecipient
+            feeRecipient,
+            1 days
         );
     }
 
@@ -177,7 +187,7 @@ contract FrpVaultTest is Test {
         emit FCashMinted(highestYieldFCash, maxDepositedAmount, fCashAmount);
         FRPVaultProxy.harvest(maxDepositedAmount);
         assertEq(FRPVaultProxy.lastHarvest(), block.timestamp);
-        vm.warp(block.timestamp + FRPVaultProxy.TIMEOUT() + 1);
+        vm.warp(block.timestamp + FRPVaultProxy.timeout() + 1);
 
         assertEq(FRPVaultProxy.totalAssets(), 999561212039);
         //         fCash amount in the vault is according to wrappedfCash estimation
@@ -266,7 +276,7 @@ contract FrpVaultTest is Test {
         FRPVaultProxy.withdraw(amount / 2, usdcWhale, usdcWhale);
         assertEq(highestYieldFCash.balanceOf(address(FRPVaultProxy)), 50160346219823);
         assertEq(usdc.balanceOf(address(FRPVaultProxy)), 317);
-        assertEq(FRPVaultProxy.balanceOf(feeRecipient), 2997322593783569350845);
+        assertEq(FRPVaultProxy.balanceOf(feeRecipient), 4499137477375791733362);
 
         // withdrawing half of the remaining half
         fCashAmount = highestYieldFCash.previewWithdraw(amount / 4 - usdc.balanceOf(address(FRPVaultProxy)));
@@ -274,19 +284,19 @@ contract FrpVaultTest is Test {
 
         assertEq(highestYieldFCash.balanceOf(address(FRPVaultProxy)), 25009309676413);
         assertEq(usdc.balanceOf(address(FRPVaultProxy)), 324);
-        assertEq(FRPVaultProxy.balanceOf(feeRecipient), 3498000279480289937196);
+        assertEq(FRPVaultProxy.balanceOf(feeRecipient), 5750832490637513444127);
 
         // Redeeming the leftover amount
         FRPVaultProxy.redeem(FRPVaultProxy.balanceOf(usdcWhale), usdcWhale, usdcWhale);
         assertEq(FRPVaultProxy.balanceOf(usdcWhale), 0);
-        assertEq(FRPVaultProxy.balanceOf(feeRecipient), 3988349179041450331346);
+        assertEq(FRPVaultProxy.balanceOf(feeRecipient), 6961838090250646297346);
 
         // There is some usdc and fCash amount left in the vault due to difference between oracle and instant rate.
-        assertEq(highestYieldFCash.balanceOf(address(FRPVaultProxy)), 385992881399);
-        assertEq(usdc.balanceOf(address(FRPVaultProxy)), 428);
+        assertEq(highestYieldFCash.balanceOf(address(FRPVaultProxy)), 684658707729);
+        assertEq(usdc.balanceOf(address(FRPVaultProxy)), 375);
 
         // User losses certain amount of USDC due to slippage
-        assertEq(balanceBeforeDeposit - usdc.balanceOf(usdcWhale), 5273005980);
+        assertEq(balanceBeforeDeposit - usdc.balanceOf(usdcWhale), 8241063687);
     }
 
     function testWithdrawalFuzzing(uint assets) public {
@@ -408,7 +418,7 @@ contract FrpVaultTest is Test {
         // https://eips.ethereum.org/EIPS/eip-4626#maxwithdraw => MUST return the maximum amount of assets that could be transferred from owner
         // through withdraw and not cause a revert, which MUST NOT be higher than the actual maximum that would be accepted
         // (it should underestimate if necessary).
-        assertEq(FRPVaultProxy.balanceOf(usdcWhale), 481281536297);
+        assertEq(FRPVaultProxy.balanceOf(usdcWhale), 535314264382);
         assertEq(sharesBurned, shares);
         assertEq(usdc.balanceOf(usdcWhale) - balanceOfUsdcBefore, maxAssetAmount);
 
@@ -501,8 +511,8 @@ contract FrpVaultTest is Test {
         uint sharesBalanceBefore = FRPVaultProxy.balanceOf(usdcWhale);
         uint feeRecipientBalanceBefore = FRPVaultProxy.balanceOf(feeRecipient);
 
-        uint fee = 100060916166202164310;
-        uint sharesBurnt = 50130518999267284319428;
+        uint fee = 250152290415505410775;
+        uint sharesBurnt = 50280610373516587565893;
 
         assertEq(FRPVaultProxy.previewRedeem(sharesBurnt), assetsToWithdraw - 1);
         assertEq(FRPVaultProxy.previewWithdraw(assetsToWithdraw), sharesBurnt);
@@ -561,7 +571,7 @@ contract FrpVaultTest is Test {
         usdc.approve(address(FRPVaultProxy), type(uint).max);
         FRPVaultProxy.deposit(amount, usdcWhale);
         FRPVaultProxy.harvest(amount);
-        vm.warp(block.timestamp + FRPVaultProxy.TIMEOUT() + 1);
+        vm.warp(block.timestamp + FRPVaultProxy.timeout() + 1);
 
         FRPVaultProxy.deposit(amount, usdcWhale);
         IFRPVault.NotionalMarket[] memory markets = FRPVaultProxy.__getThreeAndSixMonthMarkets();
@@ -592,17 +602,17 @@ contract FrpVaultTest is Test {
         vm.expectEmit(true, false, false, true);
         emit FCashRedeemed(lowestYieldFCash, 9989611150, 1005021519000);
         vm.expectEmit(true, false, false, true);
-        emit FCashRedeemed(highestYieldFCash, 9888642932, 1000822749357);
+        emit FCashRedeemed(highestYieldFCash, 9811257783, 992990533722);
         FRPVaultProxy.redeem(FRPVaultProxy.balanceOf(usdcWhale), usdcWhale, usdcWhale);
 
         assertEq(lowestYieldFCash.balanceOf(address(FRPVaultProxy)), 0);
-        assertEq(highestYieldFCash.balanceOf(address(FRPVaultProxy)), 8617722643);
+        assertEq(highestYieldFCash.balanceOf(address(FRPVaultProxy)), 16449938278);
         assertEq(FRPVaultProxy.balanceOf(usdcWhale), 0);
-        assertEq(usdc.balanceOf(address(FRPVaultProxy)), 494);
+        assertEq(usdc.balanceOf(address(FRPVaultProxy)), 496);
 
         uint balanceAfterWithdrawal = usdc.balanceOf(usdcWhale);
         // User losses certain amount of USDC due to slippage
-        assertEq(balanceBeforeDeposit - balanceAfterWithdrawal, 121746397);
+        assertEq(balanceBeforeDeposit - balanceAfterWithdrawal, 199131548);
 
         vm.stopPrank();
     }
@@ -774,7 +784,7 @@ contract FrpVaultTest is Test {
         }
 
         // Next slot is currencyId, maxLoss and notionalRouter inside FRPVault
-        assertEq(load(address(FRPVaultProxy), 504), 0x00000000000000001344a36a1b56144c3bc62e7757377d288fde036923280003);
+        assertEq(load(address(FRPVaultProxy), 504), 0x000000001344a36a1b56144c3bc62e7757377d288fde03692328000300015180);
 
         // Next slot is wrappedfCashFactory inside FRPVault
         assertEq(load(address(FRPVaultProxy), 505), 0x0000000000000000000000005d051deb5db151c2172dcdccd42e6a2953e27261);

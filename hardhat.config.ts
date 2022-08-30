@@ -1,3 +1,4 @@
+import '@nomiclabs/hardhat-etherscan'
 import '@nomiclabs/hardhat-waffle'
 import '@typechain/hardhat'
 import 'dotenv/config'
@@ -21,6 +22,7 @@ function getRemappings() {
 }
 
 // task("example", "Example task").setAction(example);
+const secret = process.env.PRIVATE_KEY as string
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -29,6 +31,14 @@ const config: HardhatUserConfig = {
       optimizer: {
         enabled: true,
         runs: 200
+      },
+      metadata: {
+        bytecodeHash: 'none'
+      },
+      outputSelection: {
+        '*': {
+          '*': ['storageLayout']
+        }
       }
     }
   },
@@ -61,9 +71,22 @@ const config: HardhatUserConfig = {
       blockGasLimit: 30_000_000
     },
     frp: {
-      url: 'https://chain.frp.phuture.finance/',
+      url: 'https://chain.dev.phuture.finance/',
       timeout: 100_000_000
+    },
+    ropsten: {
+      url: `https://ropsten.infura.io/v3/${process.env.INFURA_API_KEY}`,
+      accounts: [secret]
+    },
+    mainnet: {
+      url: `https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`,
+      accounts: [secret]
     }
+  },
+  etherscan: {
+    // Your API key for Etherscan
+    // Obtain one at https://etherscan.io/
+    apiKey: process.env.ETHERSCAN_API_KEY as string
   },
   gasReporter: {
     enabled: !!process.env.REPORT_GAS,
