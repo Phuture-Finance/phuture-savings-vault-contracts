@@ -3,6 +3,7 @@
 pragma solidity 0.8.13;
 
 import "./IFRPViewer.sol";
+import { IWrappedfCashComplete } from "../external/notional/interfaces/IWrappedfCash.sol";
 
 /// @title Fixed rate product vault helper view functions interface
 /// @notice Describes helper view functions
@@ -25,10 +26,22 @@ interface IFRPViews {
     /// @param _amount Amount to check
     /// @param _FRP Address of the vault
     /// @return canHarvest true if it can harvest
-    function canHarvestAmount(uint _amount, address _FRP) external view returns (bool canHarvest);
+    function canHarvestAmount(
+        uint _amount,
+        address _FRP,
+        IWrappedfCashComplete _wrappedfCash
+    ) external view returns (bool);
 
     /// @notice Max amount which can be deposited onto Notional
     /// @param _FRP Address of the vault
     /// @return maxDepositedAmount  max deposited amount available
     function getMaxDepositedAmount(address _FRP) external view returns (uint maxDepositedAmount);
+
+    function canHarvestScaledAmount(
+        uint _amount,
+        address _FRP,
+        IWrappedfCashComplete wrappedfCash
+    ) external view returns (bool canHarvest, uint scaledAmount);
+
+    function getHighestYieldfCash(address _FRP) external view returns (address wrappedfCash);
 }

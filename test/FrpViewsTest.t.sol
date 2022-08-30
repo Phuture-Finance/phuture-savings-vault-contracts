@@ -139,11 +139,14 @@ contract FrpViewesTest is Test {
     }
 
     function testCanHarvestAmount() public {
+        IWrappedfCashComplete highestYieldFCash = IWrappedfCashComplete(
+            views.getHighestYieldfCash(address(FRPVaultProxy))
+        );
         uint amount = 500_000 * 1e6;
         FRPVaultProxy.setMaxLoss(9990);
         FRPVaultProxy.deposit(amount, usdcWhale);
-        assertTrue(views.canHarvestAmount(amount / 8, address(FRPVaultProxy)));
-        assertFalse(views.canHarvestAmount(amount, address(FRPVaultProxy)));
+        assertTrue(views.canHarvestAmount(amount / 8, address(FRPVaultProxy), highestYieldFCash));
+        assertFalse(views.canHarvestAmount(amount, address(FRPVaultProxy), highestYieldFCash));
     }
 
     // Internal helper functions for setting-up the system

@@ -28,7 +28,8 @@ async function main() {
       mainnetConfig.notional.wrappedfCashFactory,
       mainnetConfig.notional.router,
       9800,
-      admin.address
+      admin.address,
+      10
     ])
   )
   FRPVault = FRPVault.attach(FRPVaultProxy.address)

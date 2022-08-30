@@ -5,15 +5,16 @@ pragma solidity 0.8.13;
 /// @title JobConfig interface
 /// @notice Describes function for configuring phuture jobs
 interface IJobConfig {
-    enum HarvestingAmount {
+    enum HarvestingSpecification {
         MAX_AMOUNT,
         MAX_DEPOSITED_AMOUNT,
-        SCALED_AMOUNT
+        LINEAR_SCALED_AMOUNT,
+        SLIPPAGE_SCALED_AMOUNT
     }
 
     /// @notice Sets harvesting amount specification
-    /// @param _harvestingAmount Enum which specifies the harvesting amount calculation method
-    function setHarvestingAmountSpecification(HarvestingAmount _harvestingAmount) external;
+    /// @param _harvestingSpecification Enum which specifies the harvesting amount calculation method
+    function setHarvestingAmountSpecification(HarvestingSpecification _harvestingSpecification) external;
 
     /// @notice FRPViews contract address
     /// @param _frpViews Address of the FRPViews
