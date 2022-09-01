@@ -149,6 +149,16 @@ contract FrpViewesTest is Test {
         assertFalse(views.canHarvestAmount(amount, address(FRPVaultProxy), highestYieldFCash));
     }
 
+    function testCanHarvestScaledAmount() public {
+        IWrappedfCashComplete highestYieldFCash = IWrappedfCashComplete(
+            views.getHighestYieldfCash(address(FRPVaultProxy))
+        );
+        uint amount = 500_000 * 1e6;
+        FRPVaultProxy.setMaxLoss(9990);
+        FRPVaultProxy.deposit(amount, usdcWhale);
+        views.canHarvestScaledAmount(amount, address(FRPVaultProxy), highestYieldFCash);
+    }
+
     // Internal helper functions for setting-up the system
 
     function getNotionalMarketParameters(uint maturity, uint oracleRate)

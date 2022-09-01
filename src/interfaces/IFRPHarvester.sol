@@ -15,6 +15,10 @@ interface IFRPHarvester {
     /// @param _timeout Time between two harvests
     function setTimeout(uint32 _timeout) external;
 
+    /// @notice Sets last harvest time, only executable by Phuture job contract
+    /// @param _lastHarvest Timestamp of last harvest
+    function setLastHarvest(uint96 _lastHarvest) external;
+
     /// @notice Time required to pass between two harvest events
     /// @return Returns timeout
     function timeout() external view returns (uint32);

@@ -3,6 +3,7 @@ pragma solidity 0.8.13;
 
 import "forge-std/Test.sol";
 import { MarketParameters } from "../src/external/notional/interfaces/INotional.sol";
+import "../src/external/notional/interfaces/INotionalV2.sol";
 import { IWrappedfCashComplete, IWrappedfCash } from "../src/external/notional/interfaces/IWrappedfCash.sol";
 import "../src/external/notional/proxy/WrappedfCashFactory.sol";
 import "openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
@@ -71,8 +72,79 @@ contract FrpVaultTest is Test {
         // msg.sender inside setUp is 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38
         FRPVaultProxy.grantRole(keccak256("VAULT_MANAGER_ROLE"), msg.sender);
         FRPVaultProxy.grantRole(keccak256("HARVESTER_ROLE"), msg.sender);
-        FRPVaultProxy.grantRole(keccak256("HARVESTER_ROLE"), usdcWhale);
         FRPVaultProxy.grantRole(keccak256("VAULT_MANAGER_ROLE"), usdcWhale);
+    }
+
+    function testGetfCashLendFromDeposit(uint assets, uint32 minImpliedRate) public {
+        vm.assume(assets < 6_000_000 * 1e6 && assets > 0);
+        INotionalV2 calculationViews = INotionalV2(notionalRouter);
+        address[] memory positions = FRPVaultProxy._fCashPositions();
+        IWrappedfCashComplete fCash = IWrappedfCashComplete(positions[0]);
+        (uint fCashAmount, ,) = calculationViews.getfCashLendFromDeposit(
+            currencyId,
+            assets,
+            fCash.getMaturity(),
+            minImpliedRate,
+            block.timestamp,
+            true
+        );
+        assertGt(fCashAmount + 1, assets * 100);
+    }
+
+    function testGetfCashLendFromDepositManual() public {
+        INotionalV2 calculationViews = INotionalV2(notionalRouter);
+        address[] memory positions = FRPVaultProxy._fCashPositions();
+        IWrappedfCashComplete fCash = IWrappedfCashComplete(positions[0]);
+        // This function reverts
+        (uint fCashAmount, , ) = calculationViews.getfCashLendFromDeposit(
+            currencyId,
+            7_000_000 * 1e6,
+            fCash.getMaturity(),
+            type(uint32).max,
+            block.timestamp,
+            true
+        );
+        assertGt(fCashAmount + 1, 6386110134609 * 100);
+    }
+
+    function testGetfCashLendFromDepositFixedMinImpliedRate() public {
+//        vm.assume(assets < 10_000_000 * 1e6 && assets > 0);
+        INotionalV2 calculationViews = INotionalV2(notionalRouter);
+        (, IFRPVault.NotionalMarket memory highestYieldMarket) = FRPVaultProxy.sortMarketsByOracleRate();
+        IWrappedfCashComplete fCash = IWrappedfCashComplete(IWrappedfCashFactory(wrappedfCashFactory).deployWrapper(
+        currencyId,
+        uint40(highestYieldMarket.maturity)
+        ));
+        console.log("oracle rate is: ", highestYieldMarket.oracleRate * 5);
+        (uint fCashAmount, , ) = calculationViews.getfCashLendFromDeposit(
+            currencyId,
+            1_000_000 * 1e6,
+            fCash.getMaturity(),
+            uint32(highestYieldMarket.oracleRate) * 5,
+            block.timestamp,
+            true
+        );
+        console.log(fCashAmount / 1e8); // 1_004_567
+//        assertGt(fCashAmount + 1, assets * 100);
+    }
+
+    function testGetfCashLendFromDepositFixedAssets(uint32 minImpliedRate) public {
+        vm.assume(minImpliedRate < type(uint32).max && minImpliedRate > 100);
+        INotionalV2 calculationViews = INotionalV2(notionalRouter);
+        (, IFRPVault.NotionalMarket memory highestYieldMarket) = FRPVaultProxy.sortMarketsByOracleRate();
+        IWrappedfCashComplete fCash = IWrappedfCashComplete(IWrappedfCashFactory(wrappedfCashFactory).deployWrapper(
+                currencyId,
+                uint40(highestYieldMarket.maturity)
+            ));
+        (uint fCashAmount, , ) = calculationViews.getfCashLendFromDeposit(
+            currencyId,
+            1_000_000 * 1e6,
+            fCash.getMaturity(),
+            minImpliedRate,
+            block.timestamp,
+            true
+        );
+        assertEq(fCashAmount, 100456779100000);
     }
 
     function testMainnetDeployment() public {
@@ -109,8 +181,6 @@ contract FrpVaultTest is Test {
         // assert roles, since the FRPVault is deployed by the testing contract
         assertTrue(FRPVaultProxy.hasRole(FRPVaultProxy._VAULT_ADMIN_ROLE(), address(this)));
         assertTrue(FRPVaultProxy.hasRole(FRPVaultProxy._VAULT_MANAGER_ROLE(), setupMsgSender));
-        assertTrue(FRPVaultProxy.hasRole(FRPVaultProxy._HARVESTER_ROLE(), setupMsgSender));
-        assertTrue(FRPVaultProxy.hasRole(FRPVaultProxy._HARVESTER_ROLE(), usdcWhale));
     }
 
     function testCannotInitializeWithInvalidMaxLoss() public {
@@ -797,6 +867,10 @@ contract FrpVaultTest is Test {
 
         // Next slot is lastTransferTime and feeRecipient inside FRPVault
         assertEq(load(address(FRPVaultProxy), 508), 0x000000000000000000000000000000000000abcd000000000000000062d68ebe);
+    }
+
+    function testPhutureJob() public {
+
     }
 
     // Internal helper functions for setting-up the system

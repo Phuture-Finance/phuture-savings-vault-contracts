@@ -16,6 +16,8 @@ interface IJobConfig {
     /// @param _harvestingSpecification Enum which specifies the harvesting amount calculation method
     function setHarvestingAmountSpecification(HarvestingSpecification _harvestingSpecification) external;
 
+    function getHarvestingSpecification(uint index) external returns (HarvestingSpecification);
+
     /// @notice FRPViews contract address
     /// @param _frpViews Address of the FRPViews
     function setFrpViews(address _frpViews) external;

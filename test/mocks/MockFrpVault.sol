@@ -21,10 +21,6 @@ contract MockFrpVault is FRPVault {
         return VAULT_MANAGER_ROLE;
     }
 
-    function _HARVESTER_ROLE() public pure returns (bytes32) {
-        return HARVESTER_ROLE;
-    }
-
     function _fCashPositions() public view returns (address[] memory) {
         address[] memory positions = new address[](2);
         for (uint i = 0; i < 2; i++) {

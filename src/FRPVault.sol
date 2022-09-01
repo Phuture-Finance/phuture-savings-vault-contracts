@@ -23,6 +23,8 @@ import "./libraries/AUMCalculationLibrary.sol";
 import "./interfaces/IFRPHarvester.sol";
 import "./interfaces/IFRPViewer.sol";
 
+import "forge-std/console.sol";
+
 /// @title Fixed rate product vault
 /// @notice Contains logic for integration with Notional protocol
 contract FRPVault is
@@ -132,8 +134,8 @@ contract FRPVault is
     }
 
     /// @inheritdoc IFRPHarvester
-    function harvest(uint _maxDepositedAmount) external nonReentrant onlyRole(HARVESTER_ROLE) {
-        require(canHarvest(), "FRP:TIMEOUT");
+    function harvest(uint _maxDepositedAmount) external nonReentrant {
+        console.log("harvest entered");
         _redeemAssetsIfMarketMatured();
 
         address _asset = asset();
@@ -156,16 +158,18 @@ contract FRPVault is
         _sortfCashPositions(lowestYieldfCash, highestYieldfCash);
 
         uint fCashAmount = IWrappedfCashComplete(highestYieldfCash).previewDeposit(deposited);
+        uint fCashAmountOracle = IWrappedfCashComplete(highestYieldfCash).convertToShares(deposited);
+        require(fCashAmount >= (fCashAmountOracle * maxLoss) / BP, "FRPVault: SLIPPAGE"); // TODO = create custom error
 
         IERC20Upgradeable(_asset).safeApprove(highestYieldfCash, deposited);
         IWrappedfCashComplete(highestYieldfCash).mintViaUnderlying(
             deposited,
             _safeUint88(fCashAmount),
             address(this),
-            uint32((highestYieldMarket.oracleRate * maxLoss) / BP)
+            0
+//            uint32((highestYieldMarket.oracleRate * maxLoss) / BP)
         );
         IERC20Upgradeable(_asset).safeApprove(highestYieldfCash, 0);
-        lastHarvest = uint96(block.timestamp);
         emit FCashMinted(IWrappedfCashComplete(highestYieldfCash), deposited, fCashAmount);
     }
 
@@ -177,6 +181,11 @@ contract FRPVault is
     /// @inheritdoc IFRPHarvester
     function setTimeout(uint32 _timeout) external onlyRole(VAULT_MANAGER_ROLE) {
         timeout = _timeout;
+    }
+
+    /// @inheritdoc IFRPHarvester
+    function setLastHarvest(uint96 _lastHarvest) external onlyRole(HARVESTER_ROLE) {
+        lastHarvest = _lastHarvest;
     }
 
     /// @inheritdoc IFRPViewer
@@ -316,7 +325,7 @@ contract FRPVault is
 
     /// @inheritdoc IFRPHarvester
     function canHarvest() public view returns (bool) {
-        return block.timestamp - lastHarvest > timeout;
+        return block.timestamp - lastHarvest >= timeout;
     }
 
     /// @inheritdoc IFRPHarvester

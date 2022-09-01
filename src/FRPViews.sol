@@ -13,6 +13,8 @@ import "./interfaces/IFRPHarvester.sol";
 import "./interfaces/IFRPVault.sol";
 import "./interfaces/IFRPViews.sol";
 
+import "forge-std/console.sol";
+
 /// @title Fixed rate product vault helper view functions
 /// @notice Contains helper view functions
 contract FRPViews is IFRPViews {
@@ -61,14 +63,18 @@ contract FRPViews is IFRPViews {
         address _FRP,
         IWrappedfCashComplete wrappedfCash
     ) external view returns (bool canHarvest, uint scaledAmount) {
-        uint fCashAmount = wrappedfCash.previewDeposit(_amount);
+        uint fCashAmount = wrappedfCash.previewDeposit(_amount); // how to estimate this. Estimate based on the _amount * oracleRate
+        console.log("fCashAmount=", fCashAmount);
         uint fCashAmountMinimum = (wrappedfCash.convertToShares(_amount) * IFRPViewer(_FRP).maxLoss()) /
             IFRPViewer(_FRP).BP();
+        console.log("fCashAmountMinimum=", fCashAmountMinimum);
         if (fCashAmount >= fCashAmountMinimum) {
+            console.log("fCashAmount >= fCashAmountMinimum");
             scaledAmount = _amount;
             canHarvest = true;
         } else {
             scaledAmount = (_amount * fCashAmount) / fCashAmountMinimum;
+            console.log("scaledAmount=", scaledAmount);
             canHarvest = false;
         }
     }
@@ -79,8 +85,11 @@ contract FRPViews is IFRPViews {
         address _FRP,
         IWrappedfCashComplete _wrappedfCash
     ) public view returns (bool) {
+        console.log("******************canHarvestAmount***********************+");
         uint fCashAmount = _wrappedfCash.previewDeposit(_amount);
         uint fCashAmountOracle = _wrappedfCash.convertToShares(_amount);
+        console.log("amount is:", _amount);
+        console.log("canHarvestAmount=",fCashAmount >= (fCashAmountOracle * IFRPViewer(_FRP).maxLoss()) / IFRPViewer(_FRP).BP());
         return (fCashAmount >= (fCashAmountOracle * IFRPViewer(_FRP).maxLoss()) / IFRPViewer(_FRP).BP());
     }
 
