@@ -1,9 +1,23 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/dist/src/signer-with-address'
+import { Contract } from 'ethers'
 import { ethers } from 'hardhat'
 import * as mainnetConfig from '../eth_mainnet.json'
-import { FRPVault, FRPVault__factory, IERC20, IERC20__factory } from '../typechain-types'
+import * as Keepr3rMock from '../out/Keepr3rMock.sol/Keepr3rMock.json'
+import {
+  FRPVault,
+  FRPVault__factory,
+  FRPViews,
+  FRPViews__factory,
+  IERC20,
+  IERC20__factory,
+  JobConfig,
+  JobConfig__factory,
+  PhutureJob,
+  PhutureJob__factory
+} from '../typechain-types'
 import { impersonate, reset, setBalance, snapshot } from '../utils/evm'
 import { expandTo18Decimals, expandTo6Decimals, newProxyContract, randomAddress } from '../utils/helpers'
+import { HARVESTER_ROLE, VAULT_MANAGER_ROLE } from '../utils/roles'
 
 describe('FrpVault interaction with wrappedFCash [ @forked-mainnet]', function () {
   this.timeout(1e8)
@@ -13,6 +27,10 @@ describe('FrpVault interaction with wrappedFCash [ @forked-mainnet]', function (
   let USDC: IERC20
 
   let frpVault: FRPVault
+  let frpViews: FRPViews
+  let jobConfig: JobConfig
+  let phutureJob: PhutureJob
+  let keep3r: Contract
 
   let snapshotId: string
 
@@ -21,7 +39,7 @@ describe('FrpVault interaction with wrappedFCash [ @forked-mainnet]', function (
 
     await reset({
       jsonRpcUrl: process.env.MAINNET_HTTPS_URL,
-      blockNumber: 15_172_678
+      blockNumber: 15_272_678
     })
 
     usdcWhale = await impersonate(mainnetConfig.whales.USDC)
@@ -37,9 +55,18 @@ describe('FrpVault interaction with wrappedFCash [ @forked-mainnet]', function (
       mainnetConfig.notional.currencyIdUSDC,
       mainnetConfig.notional.wrappedfCashFactory,
       mainnetConfig.notional.router,
-      9800,
-      randomAddress()
+      9900,
+      randomAddress(),
+      0
     ])
+
+    frpViews = await new FRPViews__factory(signer).deploy()
+    jobConfig = await new JobConfig__factory(signer).deploy(frpViews.address)
+    keep3r = await new ethers.ContractFactory(Keepr3rMock.abi, Keepr3rMock.bytecode, signer).deploy()
+    phutureJob = await new PhutureJob__factory(signer).deploy(keep3r.address, jobConfig.address)
+    await phutureJob.unpause()
+    await frpVault.grantRole(HARVESTER_ROLE, phutureJob.address)
+    await frpVault.grantRole(VAULT_MANAGER_ROLE, usdcWhale.address)
 
     await USDC.connect(usdcWhale).approve(frpVault.address, ethers.constants.MaxUint256)
     await USDC.connect(signer).approve(frpVault.address, ethers.constants.MaxUint256)
@@ -57,18 +84,10 @@ describe('FrpVault interaction with wrappedFCash [ @forked-mainnet]', function (
     await frpVault.connect(usdcWhale).deposit(expandTo6Decimals(100), usdcWhale.address)
     await frpVault.connect(usdcWhale).harvest(ethers.constants.MaxUint256)
 
-    const mintGasEstimate = await frpVault
-      .connect(usdcWhale)
-      .estimateGas.mint(expandTo18Decimals(1000), usdcWhale.address)
-    console.log(`mint gas cost is: ${mintGasEstimate}`)
-
-    const depositGasEstimate = await frpVault
-      .connect(usdcWhale)
-      .estimateGas.deposit(expandTo6Decimals(1000), usdcWhale.address)
-    console.log(`deposit gas cost is: ${depositGasEstimate}`)
-
     // To be used with the gas reporter
-    await frpVault.connect(usdcWhale).deposit(expandTo6Decimals(100), usdcWhale.address)
-    await frpVault.connect(usdcWhale).mint(expandTo18Decimals(100), usdcWhale.address)
+    await frpVault.connect(usdcWhale).deposit(expandTo6Decimals(1_500_000), usdcWhale.address)
+
+    await frpVault.connect(usdcWhale).setMaxLoss(9550)
+    await phutureJob.harvest(frpVault.address, { gasLimit: 5_000_000 })
   })
 })

@@ -12,8 +12,6 @@ import "./interfaces/IFRPHarvester.sol";
 import "./interfaces/IJobConfig.sol";
 import "./interfaces/IPhutureJob.sol";
 
-import "forge-std/console.sol";
-
 /// @title Phuture job
 /// @notice Contains harvesting execution logic through keeper network
 contract PhutureJob is IPhutureJob, IKeeper3r, IHarvestingJob, Pausable, Ownable {
@@ -54,7 +52,8 @@ contract PhutureJob is IPhutureJob, IKeeper3r, IHarvestingJob, Pausable, Ownable
     /// @inheritdoc IHarvestingJob
     function harvest(IFRPHarvester _vault) external override whenNotPaused payKeeper(msg.sender) {
         require(_vault.canHarvest(), "PhutureJob:TIMEOUT");
-        _vault.harvest(IJobConfig(jobConfig).getDepositedAmount(address(_vault)));
+        uint depositedAmount = IJobConfig(jobConfig).getDepositedAmount(address(_vault));
+        _vault.harvest(depositedAmount);
         _vault.setLastHarvest(uint96(block.timestamp));
     }
 }

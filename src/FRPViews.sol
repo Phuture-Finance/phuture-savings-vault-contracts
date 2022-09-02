@@ -8,12 +8,12 @@ import "openzeppelin-contracts-upgradeable/contracts/interfaces/IERC4626Upgradea
 import "./external/notional/lib/DateTime.sol";
 import { IWrappedfCashComplete } from "./external/notional/interfaces/IWrappedfCash.sol";
 import { NotionalViews, MarketParameters } from "./external/notional/interfaces/INotional.sol";
+import "./external/notional/interfaces/INotionalV2.sol";
+
 import "./interfaces/IFRPViewer.sol";
 import "./interfaces/IFRPHarvester.sol";
 import "./interfaces/IFRPVault.sol";
 import "./interfaces/IFRPViews.sol";
-
-import "forge-std/console.sol";
 
 /// @title Fixed rate product vault helper view functions
 /// @notice Contains helper view functions
@@ -49,55 +49,55 @@ contract FRPViews is IFRPViews {
     }
 
     /// @inheritdoc IFRPViews
-    function canHarvestMaxDepositedAmount(address _FRP)
-        external
-        view
-        returns (bool canHarvest, uint maxDepositedAmount)
-    {
-        maxDepositedAmount = getMaxDepositedAmount(_FRP);
-        canHarvest = canHarvestAmount(maxDepositedAmount, _FRP, IWrappedfCashComplete(getHighestYieldfCash(_FRP)));
-    }
-
-    function canHarvestScaledAmount(
+    function scaleAmount(
+        address _frp,
         uint _amount,
-        address _FRP,
-        IWrappedfCashComplete wrappedfCash
-    ) external view returns (bool canHarvest, uint scaledAmount) {
-        uint fCashAmount = wrappedfCash.previewDeposit(_amount); // how to estimate this. Estimate based on the _amount * oracleRate
-        console.log("fCashAmount=", fCashAmount);
-        uint fCashAmountMinimum = (wrappedfCash.convertToShares(_amount) * IFRPViewer(_FRP).maxLoss()) /
-            IFRPViewer(_FRP).BP();
-        console.log("fCashAmountMinimum=", fCashAmountMinimum);
-        if (fCashAmount >= fCashAmountMinimum) {
-            console.log("fCashAmount >= fCashAmountMinimum");
-            scaledAmount = _amount;
-            canHarvest = true;
-        } else {
-            scaledAmount = (_amount * fCashAmount) / fCashAmountMinimum;
-            console.log("scaledAmount=", scaledAmount);
-            canHarvest = false;
+        uint _percentage,
+        uint _steps
+    ) external view returns (uint) {
+        (
+            uint maturity,
+            uint32 minImpliedRate,
+            uint16 currencyId,
+            INotionalV2 calculationViews
+        ) = getHighestYieldMarketParameters(_frp);
+        (uint fCashAmount, , ) = calculationViews.getfCashLendFromDeposit(
+            currencyId,
+            _amount,
+            maturity,
+            minImpliedRate,
+            block.timestamp,
+            true
+        );
+        uint scalingAmount = (fCashAmount * _percentage) / 100;
+        for (uint i = 0; i < _steps + 1; i++) {
+            try
+                calculationViews.getDepositFromfCashLend(
+                    currencyId,
+                    fCashAmount,
+                    maturity,
+                    minImpliedRate,
+                    block.timestamp
+                )
+            returns (uint amountUnderlying, uint, uint8, bytes32) {
+                return amountUnderlying;
+            } catch {
+                // If we can scale it further we continue, else we exit the for loop.
+                if (fCashAmount >= scalingAmount) {
+                    fCashAmount = fCashAmount - scalingAmount;
+                } else {
+                    break;
+                }
+            }
         }
+        return 0;
     }
 
     /// @inheritdoc IFRPViews
-    function canHarvestAmount(
-        uint _amount,
-        address _FRP,
-        IWrappedfCashComplete _wrappedfCash
-    ) public view returns (bool) {
-        console.log("******************canHarvestAmount***********************+");
-        uint fCashAmount = _wrappedfCash.previewDeposit(_amount);
-        uint fCashAmountOracle = _wrappedfCash.convertToShares(_amount);
-        console.log("amount is:", _amount);
-        console.log("canHarvestAmount=",fCashAmount >= (fCashAmountOracle * IFRPViewer(_FRP).maxLoss()) / IFRPViewer(_FRP).BP());
-        return (fCashAmount >= (fCashAmountOracle * IFRPViewer(_FRP).maxLoss()) / IFRPViewer(_FRP).BP());
-    }
-
-    /// @inheritdoc IFRPViews
-    function getMaxDepositedAmount(address _FRP) public view returns (uint maxDepositedAmount) {
-        maxDepositedAmount += IERC4626Upgradeable(IERC4626Upgradeable(_FRP).asset()).balanceOf(_FRP);
-        address[2] memory fCashPositions = IFRPViewer(_FRP).getfCashPositions();
-        uint8 supportedMaturities = IFRPViewer(_FRP).SUPPORTED_MATURITIES();
+    function getMaxDepositedAmount(address _frp) public view returns (uint maxDepositedAmount) {
+        maxDepositedAmount += IERC4626Upgradeable(IERC4626Upgradeable(_frp).asset()).balanceOf(_frp);
+        address[2] memory fCashPositions = IFRPViewer(_frp).getfCashPositions();
+        uint8 supportedMaturities = IFRPViewer(_frp).SUPPORTED_MATURITIES();
         for (uint i = 0; i < supportedMaturities; i++) {
             IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions[i]);
             if (fCashPosition.hasMatured()) {
@@ -109,12 +109,21 @@ contract FRPViews is IFRPViews {
         }
     }
 
-    function getHighestYieldfCash(address _FRP) public view returns (address wrappedfCash) {
-        (, IFRPVault.NotionalMarket memory highestYieldMarket) = IFRPHarvester(_FRP).sortMarketsByOracleRate();
-        IWrappedfCashFactory wrappedfCashFactory = IWrappedfCashFactory(IFRPViewer(_FRP).wrappedfCashFactory());
-        wrappedfCash = wrappedfCashFactory.computeAddress(
-            IFRPViewer(_FRP).currencyId(),
-            uint40(highestYieldMarket.maturity)
-        );
+    /// @inheritdoc IFRPViews
+    function getHighestYieldMarketParameters(address _frp)
+        public
+        view
+        returns (
+            uint maturity,
+            uint32 minImpliedRate,
+            uint16 currencyId,
+            INotionalV2 calculationViews
+        )
+    {
+        (, IFRPVault.NotionalMarket memory highestYieldMarket) = IFRPHarvester(_frp).sortMarketsByOracleRate();
+        maturity = highestYieldMarket.maturity;
+        minImpliedRate = uint32((highestYieldMarket.oracleRate * IFRPViewer(_frp).maxLoss()) / IFRPViewer(_frp).BP());
+        currencyId = IFRPViewer(_frp).currencyId();
+        calculationViews = INotionalV2(IFRPViewer(_frp).notionalRouter());
     }
 }

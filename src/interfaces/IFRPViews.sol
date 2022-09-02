@@ -4,44 +4,47 @@ pragma solidity 0.8.13;
 
 import "./IFRPViewer.sol";
 import { IWrappedfCashComplete } from "../external/notional/interfaces/IWrappedfCash.sol";
+import "../external/notional/interfaces/INotionalV2.sol";
 
 /// @title Fixed rate product vault helper view functions interface
 /// @notice Describes helper view functions
 interface IFRPViews {
     /// @notice Spot annual percentage yield(APY) of the FRP vault
-    /// @param _FRP Address of the vault
+    /// @param _frp Address of the vault
     /// @return Returns APY of the vault with the precision of 1,000,000,000 units i.e. 37264168 equals to 3.7264168%
-    function getAPY(IFRPViewer _FRP) external view returns (uint);
-
-    /// @notice Checks if vault can harvest max amount (asset in the vault + redeemed matured fCash)
-    /// @param _FRP Address of the vault
-    /// @return canHarvest true if it can harvest max deposited amount available
-    /// @return maxDepositedAmount max deposited amount available
-    function canHarvestMaxDepositedAmount(address _FRP)
-        external
-        view
-        returns (bool canHarvest, uint maxDepositedAmount);
-
-    /// @notice Checks if vault can harvest amount
-    /// @param _amount Amount to check
-    /// @param _FRP Address of the vault
-    /// @return canHarvest true if it can harvest
-    function canHarvestAmount(
-        uint _amount,
-        address _FRP,
-        IWrappedfCashComplete _wrappedfCash
-    ) external view returns (bool);
+    function getAPY(IFRPViewer _frp) external view returns (uint);
 
     /// @notice Max amount which can be deposited onto Notional
-    /// @param _FRP Address of the vault
+    /// @param _frp Address of the vault
     /// @return maxDepositedAmount  max deposited amount available
-    function getMaxDepositedAmount(address _FRP) external view returns (uint maxDepositedAmount);
+    function getMaxDepositedAmount(address _frp) external view returns (uint maxDepositedAmount);
 
-    function canHarvestScaledAmount(
+    /// @notice Scales down the passed amount if there is price slippage. Make sure that:  percentage * steps < 10
+    /// @param _frp Address of the vault
+    /// @param _amount Amount to scale down
+    /// @param _percentage Percentage of initial amount to scale down during each step.
+    /// @param _steps Number of iterations for scaling down.
+    /// @return Scaled amount
+    function scaleAmount(
+        address _frp,
         uint _amount,
-        address _FRP,
-        IWrappedfCashComplete wrappedfCash
-    ) external view returns (bool canHarvest, uint scaledAmount);
+        uint _percentage,
+        uint _steps
+    ) external view returns (uint);
 
-    function getHighestYieldfCash(address _FRP) external view returns (address wrappedfCash);
+    /// @notice Returns highest yiled market parameters
+    /// @param _frp Address of the vault
+    /// @return maturity Maturity timestamp
+    /// @return minImpliedRate Annualized oracle interest rate scaled by maxLoss for the vault
+    /// @return currencyId Id of the currency on Notional
+    /// @return calculationViews Views contract from Notional
+    function getHighestYieldMarketParameters(address _frp)
+        external
+        view
+        returns (
+            uint maturity,
+            uint32 minImpliedRate,
+            uint16 currencyId,
+            INotionalV2 calculationViews
+        );
 }

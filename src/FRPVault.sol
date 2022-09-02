@@ -23,8 +23,6 @@ import "./libraries/AUMCalculationLibrary.sol";
 import "./interfaces/IFRPHarvester.sol";
 import "./interfaces/IFRPViewer.sol";
 
-import "forge-std/console.sol";
-
 /// @title Fixed rate product vault
 /// @notice Contains logic for integration with Notional protocol
 contract FRPVault is
@@ -135,12 +133,11 @@ contract FRPVault is
 
     /// @inheritdoc IFRPHarvester
     function harvest(uint _maxDepositedAmount) external nonReentrant {
-        console.log("harvest entered");
         _redeemAssetsIfMarketMatured();
 
         address _asset = asset();
         uint assetBalance = IERC20Upgradeable(_asset).balanceOf(address(this));
-        if (assetBalance == 0) {
+        if (assetBalance == 0 || _maxDepositedAmount == 0) {
             return;
         }
         uint deposited = Math.min(assetBalance, _maxDepositedAmount);
@@ -158,16 +155,13 @@ contract FRPVault is
         _sortfCashPositions(lowestYieldfCash, highestYieldfCash);
 
         uint fCashAmount = IWrappedfCashComplete(highestYieldfCash).previewDeposit(deposited);
-        uint fCashAmountOracle = IWrappedfCashComplete(highestYieldfCash).convertToShares(deposited);
-        require(fCashAmount >= (fCashAmountOracle * maxLoss) / BP, "FRPVault: SLIPPAGE"); // TODO = create custom error
 
         IERC20Upgradeable(_asset).safeApprove(highestYieldfCash, deposited);
         IWrappedfCashComplete(highestYieldfCash).mintViaUnderlying(
             deposited,
             _safeUint88(fCashAmount),
             address(this),
-            0
-//            uint32((highestYieldMarket.oracleRate * maxLoss) / BP)
+            uint32((highestYieldMarket.oracleRate * maxLoss) / BP)
         );
         IERC20Upgradeable(_asset).safeApprove(highestYieldfCash, 0);
         emit FCashMinted(IWrappedfCashComplete(highestYieldfCash), deposited, fCashAmount);

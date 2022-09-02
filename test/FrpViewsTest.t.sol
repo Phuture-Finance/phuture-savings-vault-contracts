@@ -17,7 +17,7 @@ import "openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../src/interfaces/IFRPVault.sol";
 import "../src/FRPViews.sol";
 
-contract FrpViewesTest is Test {
+contract FrpViewsTest is Test {
     using stdStorage for StdStorage;
     using Address for address;
 
@@ -122,41 +122,6 @@ contract FrpViewesTest is Test {
 
         FRPVaultProxy.harvest(type(uint).max);
         assertEq(views.getMaxDepositedAmount(address(FRPVaultProxy)), 0);
-    }
-
-    function testCanHarvestMaxDepositedAmount() public {
-        uint amount = 5_000_00 * 1e6;
-        FRPVaultProxy.setMaxLoss(9800);
-        FRPVaultProxy.deposit(amount, usdcWhale);
-        (bool canHarvest, uint maxDepositedAmount) = views.canHarvestMaxDepositedAmount(address(FRPVaultProxy));
-        assertEq(maxDepositedAmount, amount);
-        assertTrue(canHarvest);
-
-        FRPVaultProxy.setMaxLoss(9990);
-        (canHarvest, maxDepositedAmount) = views.canHarvestMaxDepositedAmount(address(FRPVaultProxy));
-        assertEq(maxDepositedAmount, amount);
-        assertFalse(canHarvest);
-    }
-
-    function testCanHarvestAmount() public {
-        IWrappedfCashComplete highestYieldFCash = IWrappedfCashComplete(
-            views.getHighestYieldfCash(address(FRPVaultProxy))
-        );
-        uint amount = 500_000 * 1e6;
-        FRPVaultProxy.setMaxLoss(9990);
-        FRPVaultProxy.deposit(amount, usdcWhale);
-        assertTrue(views.canHarvestAmount(amount / 8, address(FRPVaultProxy), highestYieldFCash));
-        assertFalse(views.canHarvestAmount(amount, address(FRPVaultProxy), highestYieldFCash));
-    }
-
-    function testCanHarvestScaledAmount() public {
-        IWrappedfCashComplete highestYieldFCash = IWrappedfCashComplete(
-            views.getHighestYieldfCash(address(FRPVaultProxy))
-        );
-        uint amount = 500_000 * 1e6;
-        FRPVaultProxy.setMaxLoss(9990);
-        FRPVaultProxy.deposit(amount, usdcWhale);
-        views.canHarvestScaledAmount(amount, address(FRPVaultProxy), highestYieldFCash);
     }
 
     // Internal helper functions for setting-up the system

@@ -75,78 +75,6 @@ contract FrpVaultTest is Test {
         FRPVaultProxy.grantRole(keccak256("VAULT_MANAGER_ROLE"), usdcWhale);
     }
 
-    function testGetfCashLendFromDeposit(uint assets, uint32 minImpliedRate) public {
-        vm.assume(assets < 6_000_000 * 1e6 && assets > 0);
-        INotionalV2 calculationViews = INotionalV2(notionalRouter);
-        address[] memory positions = FRPVaultProxy._fCashPositions();
-        IWrappedfCashComplete fCash = IWrappedfCashComplete(positions[0]);
-        (uint fCashAmount, ,) = calculationViews.getfCashLendFromDeposit(
-            currencyId,
-            assets,
-            fCash.getMaturity(),
-            minImpliedRate,
-            block.timestamp,
-            true
-        );
-        assertGt(fCashAmount + 1, assets * 100);
-    }
-
-    function testGetfCashLendFromDepositManual() public {
-        INotionalV2 calculationViews = INotionalV2(notionalRouter);
-        address[] memory positions = FRPVaultProxy._fCashPositions();
-        IWrappedfCashComplete fCash = IWrappedfCashComplete(positions[0]);
-        // This function reverts
-        (uint fCashAmount, , ) = calculationViews.getfCashLendFromDeposit(
-            currencyId,
-            7_000_000 * 1e6,
-            fCash.getMaturity(),
-            type(uint32).max,
-            block.timestamp,
-            true
-        );
-        assertGt(fCashAmount + 1, 6386110134609 * 100);
-    }
-
-    function testGetfCashLendFromDepositFixedMinImpliedRate() public {
-//        vm.assume(assets < 10_000_000 * 1e6 && assets > 0);
-        INotionalV2 calculationViews = INotionalV2(notionalRouter);
-        (, IFRPVault.NotionalMarket memory highestYieldMarket) = FRPVaultProxy.sortMarketsByOracleRate();
-        IWrappedfCashComplete fCash = IWrappedfCashComplete(IWrappedfCashFactory(wrappedfCashFactory).deployWrapper(
-        currencyId,
-        uint40(highestYieldMarket.maturity)
-        ));
-        console.log("oracle rate is: ", highestYieldMarket.oracleRate * 5);
-        (uint fCashAmount, , ) = calculationViews.getfCashLendFromDeposit(
-            currencyId,
-            1_000_000 * 1e6,
-            fCash.getMaturity(),
-            uint32(highestYieldMarket.oracleRate) * 5,
-            block.timestamp,
-            true
-        );
-        console.log(fCashAmount / 1e8); // 1_004_567
-//        assertGt(fCashAmount + 1, assets * 100);
-    }
-
-    function testGetfCashLendFromDepositFixedAssets(uint32 minImpliedRate) public {
-        vm.assume(minImpliedRate < type(uint32).max && minImpliedRate > 100);
-        INotionalV2 calculationViews = INotionalV2(notionalRouter);
-        (, IFRPVault.NotionalMarket memory highestYieldMarket) = FRPVaultProxy.sortMarketsByOracleRate();
-        IWrappedfCashComplete fCash = IWrappedfCashComplete(IWrappedfCashFactory(wrappedfCashFactory).deployWrapper(
-                currencyId,
-                uint40(highestYieldMarket.maturity)
-            ));
-        (uint fCashAmount, , ) = calculationViews.getfCashLendFromDeposit(
-            currencyId,
-            1_000_000 * 1e6,
-            fCash.getMaturity(),
-            minImpliedRate,
-            block.timestamp,
-            true
-        );
-        assertEq(fCashAmount, 100456779100000);
-    }
-
     function testMainnetDeployment() public {
         vm.createSelectFork(mainnetHttpsUrl);
         FRPVault frp = FRPVault(0x5cE40e68C1A011c1782499bF5fF01C910c792Ba6);
@@ -256,7 +184,7 @@ contract FrpVaultTest is Test {
         vm.expectEmit(true, false, false, true);
         emit FCashMinted(highestYieldFCash, maxDepositedAmount, fCashAmount);
         FRPVaultProxy.harvest(maxDepositedAmount);
-        assertEq(FRPVaultProxy.lastHarvest(), block.timestamp);
+        assertEq(FRPVaultProxy.lastHarvest(), 0);
         vm.warp(block.timestamp + FRPVaultProxy.timeout() + 1);
 
         assertEq(FRPVaultProxy.totalAssets(), 999561212039);
@@ -289,16 +217,6 @@ contract FrpVaultTest is Test {
         usdc.approve(address(FRPVaultProxy), type(uint).max);
         FRPVaultProxy.deposit(2_000_000 * 1e6, usdcWhale);
         vm.expectRevert(bytes("Trade failed, slippage"));
-        FRPVaultProxy.harvest(type(uint).max);
-        vm.stopPrank();
-    }
-
-    function testCannotHarvestIfLessThanTimeout() public {
-        vm.startPrank(usdcWhale);
-        usdc.approve(address(FRPVaultProxy), 1_000 * 1e6);
-        FRPVaultProxy.deposit(1_000 * 1e6, usdcWhale);
-        FRPVaultProxy.harvest(type(uint).max);
-        vm.expectRevert(bytes("FRP:TIMEOUT"));
         FRPVaultProxy.harvest(type(uint).max);
         vm.stopPrank();
     }
@@ -869,8 +787,64 @@ contract FrpVaultTest is Test {
         assertEq(load(address(FRPVaultProxy), 508), 0x000000000000000000000000000000000000abcd000000000000000062d68ebe);
     }
 
-    function testPhutureJob() public {
+    // Notional tests
 
+    function testGetfCashLendFromDeposit(uint assets, uint32 minImpliedRate) public {
+        vm.assume(assets < 5_000_000 * 1e6 && assets > 0);
+        vm.assume(minImpliedRate < type(uint32).max && minImpliedRate > 0);
+        INotionalV2 calculationViews = INotionalV2(notionalRouter);
+        address[] memory positions = FRPVaultProxy._fCashPositions();
+        IWrappedfCashComplete fCash = IWrappedfCashComplete(positions[0]);
+        (uint fCashAmount, , ) = calculationViews.getfCashLendFromDeposit(
+            currencyId,
+            assets,
+            fCash.getMaturity(),
+            minImpliedRate,
+            block.timestamp,
+            true
+        );
+        // No price impact taken into account, always returns the same value
+        assertGt(fCashAmount + 1, assets * 100);
+    }
+
+    function testFailsGetfCashLendFromDepositReverts(uint32 minImpliedRate) public {
+        vm.assume(minImpliedRate < type(uint32).max && minImpliedRate > 0);
+        INotionalV2 calculationViews = INotionalV2(notionalRouter);
+        address[] memory positions = FRPVaultProxy._fCashPositions();
+        IWrappedfCashComplete fCash = IWrappedfCashComplete(positions[0]);
+        // Function fails at around 6.3 million usdc
+        (uint fCashAmount, , ) = calculationViews.getfCashLendFromDeposit(
+            currencyId,
+            6386110134609,
+            fCash.getMaturity(),
+            minImpliedRate,
+            block.timestamp,
+            true
+        );
+    }
+
+    function testGetDepositFromfCashLend(uint32 minImpliedRate) public {
+        vm.assume(minImpliedRate < 27309715 && minImpliedRate > 0);
+        (, IFRPVault.NotionalMarket memory highestYieldMarket) = FRPVaultProxy.sortMarketsByOracleRate();
+        IWrappedfCashComplete fCash = IWrappedfCashComplete(
+            IWrappedfCashFactory(wrappedfCashFactory).deployWrapper(currencyId, uint40(highestYieldMarket.maturity))
+        );
+        // Trade fails at 27_309_715
+        uint fCashAmount = 1_000_000 * 1e8;
+        (uint amountUnderlyingSlippage, , , ) = INotionalV2(notionalRouter).getDepositFromfCashLend(
+            currencyId,
+            fCashAmount,
+            fCash.getMaturity(),
+            minImpliedRate,
+            block.timestamp
+        );
+        // below the rate it fails it always returns the same cash amount
+        assertEq(amountUnderlyingSlippage, 995450937379);
+
+        // Trying to buy the actual fCash
+        vm.startPrank(usdcWhale);
+        usdc.approve(address(fCash), 995450937379);
+        fCash.mintViaUnderlying(995450937379, 1_000_000 * 1e8, usdcWhale, 27309714);
     }
 
     // Internal helper functions for setting-up the system
