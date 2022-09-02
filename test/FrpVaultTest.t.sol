@@ -789,8 +789,8 @@ contract FrpVaultTest is Test {
 
     // Notional tests
 
-    function testGetfCashLendFromDeposit(uint assets, uint32 minImpliedRate) public {
-        vm.assume(assets < 5_000_000 * 1e6 && assets > 0);
+    function testGetfCashLendFromDeposit(uint32 minImpliedRate) public {
+        uint assets = 5_000_000 * 1e6;
         vm.assume(minImpliedRate < type(uint32).max && minImpliedRate > 0);
         INotionalV2 calculationViews = INotionalV2(notionalRouter);
         address[] memory positions = FRPVaultProxy._fCashPositions();
