@@ -56,4 +56,21 @@ interface IFRPVault {
     /// @dev Max loss range is [0 - 10_000]
     /// @param _maxLoss Maximum loss allowed
     function setMaxLoss(uint16 _maxLoss) external;
+
+    /// @notice Mints frp in exchange for assets withdrawn from the sender
+    /// @param _assets Amount of assets to deposit
+    /// @param _receiver Address which receives the minted shares
+    /// @param _deadline Maximum unix timestamp at which the signature is still valid
+    /// @param _v Last byte of the signed data
+    /// @param _r The first 64 bytes of the signed data
+    /// @param _s Bytes [64…128] of the signed data
+    /// @return Amount of frp shares to be minted for the given assets
+    function depositWithPermit(
+        uint256 _assets,
+        address _receiver,
+        uint _deadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) external returns (uint256);
 }

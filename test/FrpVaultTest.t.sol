@@ -10,7 +10,9 @@ import "openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "openzeppelin-contracts/contracts/utils/Address.sol";
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/IERC20Upgradeable.sol";
+import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
 import "./mocks/MockFrpVault.sol";
+import "./utils/SigUtils.sol";
 import "../src/FRPVault.sol";
 import "../src/interfaces/IFRPVault.sol";
 
@@ -680,6 +682,33 @@ contract FrpVaultTest is Test {
 
     function testFailsUpgradeWithoutRole() public {
         FRPVaultProxy.upgradeTo(address(new FRPVault()));
+    }
+
+    function testDepositWithPermit() public {
+        vm.startPrank(usdcWhale);
+        uint signerPrivateKey = 0xA11CE;
+        address signer = vm.addr(signerPrivateKey);
+        usdc.transfer(signer, 100_00e6);
+        vm.stopPrank();
+
+        SigUtils sigUtils = new SigUtils(ERC20PermitUpgradeable(address(usdc)).DOMAIN_SEPARATOR());
+
+        uint assets = 100e6;
+        SigUtils.Permit memory permit = SigUtils.Permit({
+            owner: signer,
+            spender: address(FRPVaultProxy),
+            value: assets,
+            nonce: ERC20PermitUpgradeable(address(usdc)).nonces(signer),
+            deadline: block.timestamp + 1 days
+        });
+        bytes32 digest = sigUtils.getTypedDataHash(permit);
+
+        vm.startPrank(signer);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, digest);
+        FRPVaultProxy.depositWithPermit(assets, signer, permit.deadline, v, r, s);
+        vm.stopPrank();
+
+        assertEq(FRPVaultProxy.balanceOf(signer), 99800399201596806388);
     }
 
     function testStorage() public {

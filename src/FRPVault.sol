@@ -270,6 +270,20 @@ contract FRPVault is
         return shares - fee;
     }
 
+    /// @inheritdoc IFRPVault
+    function depositWithPermit(
+        uint256 _assets,
+        address _receiver,
+        uint _deadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) public override returns (uint256) {
+        address _asset = asset();
+        ERC20PermitUpgradeable(_asset).permit(msg.sender, address(this), _assets, _deadline, _v, _r, _s);
+        return deposit(_assets, _receiver);
+    }
+
     /// @inheritdoc IERC4626Upgradeable
     function previewWithdraw(uint256 _assets) public view override returns (uint256) {
         uint shares = super.previewWithdraw(_assets);
