@@ -6,7 +6,7 @@ import "../external/notional/interfaces/IWrappedfCashFactory.sol";
 
 /// @title Fixed rate product vault view functions interface
 /// @notice Describes view functions
-interface IFRPViewer {
+interface ISavingsVaultViewer {
     /// @notice Number of supported maturities
     /// @return Returns number of supported maturities
     function SUPPORTED_MATURITIES() external view returns (uint8);

@@ -1,5 +1,5 @@
 import * as wfCashBaseArtifact from '../../artifacts/src/external/notional/wfCashBase.sol/wfCashBase.json'
-import * as FrpVaultArtifact from '../../artifacts/src/FrpVault.sol/FrpVault.json'
+import * as SavingsVaultArtifact from '../../artifacts/src/SavingsVault.sol/SavingsVault.json'
 
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -21,33 +21,33 @@ const extract =
 
 interface FrontAddresses {
   Asset: string
-  FrpVault: string
+  SavingsVault: string
 }
 
 const extractFrontAddresses = extract<FrontAddresses>({
   Asset: true,
-  FrpVault: true
+  SavingsVault: true
 })
 
 interface SubgraphAddresses {
   Asset: string
-  FrpVault: string
+  SavingsVault: string
 }
 
 const extractSubgraphAddresses = extract<SubgraphAddresses>({
   Asset: true,
-  FrpVault: true
+  SavingsVault: true
 })
 
 export type DeploymentsAddresses = FrontAddresses & SubgraphAddresses
 
 export interface DeploymentBlocks {
-  FrpVaultBlockNumber?: number
+  SavingsVaultBlockNumber?: number
 }
 
-const frontedArtifacts = [FrpVaultArtifact, wfCashBaseArtifact]
+const frontedArtifacts = [SavingsVaultArtifact, wfCashBaseArtifact]
 
-const subgraphArtifacts = [FrpVaultArtifact, wfCashBaseArtifact]
+const subgraphArtifacts = [SavingsVaultArtifact, wfCashBaseArtifact]
 
 export async function writeResults(addresses: DeploymentsAddresses, blocks: DeploymentBlocks): Promise<void> {
   createFolders()

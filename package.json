@@ -1,5 +1,5 @@
 {
-  "name": "@phuture/frp-contracts",
+  "name": "@phuture/savings-vault-contracts",
   "version": "0.0.1",
   "description": "The harmony between Foundry and Hardhat.",
   "directories": {

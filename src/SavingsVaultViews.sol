@@ -10,28 +10,28 @@ import { IWrappedfCashComplete } from "./external/notional/interfaces/IWrappedfC
 import { NotionalViews, MarketParameters } from "./external/notional/interfaces/INotional.sol";
 import "./external/notional/interfaces/INotionalV2.sol";
 
-import "./interfaces/IFRPViewer.sol";
-import "./interfaces/IFRPHarvester.sol";
-import "./interfaces/IFRPVault.sol";
-import "./interfaces/IFRPViews.sol";
+import "./interfaces/ISavingsVaultViewer.sol";
+import "./interfaces/ISavingsVaultHarvester.sol";
+import "./interfaces/ISavingsVault.sol";
+import "./interfaces/ISavingsVaultViews.sol";
 
-/// @title Fixed rate product vault helper view functions
+/// @title Savings vault helper view functions
 /// @notice Contains helper view functions
-contract FRPViews is IFRPViews {
-    /// @inheritdoc IFRPViews
-    function getAPY(IFRPViewer _FRP) external view returns (uint) {
-        uint16 currencyId = _FRP.currencyId();
-        address[2] memory fCashPositions = _FRP.getfCashPositions();
-        uint8 supportedMaturities = _FRP.SUPPORTED_MATURITIES();
+contract SavingsVaultViews is ISavingsVaultViews {
+    /// @inheritdoc ISavingsVaultViews
+    function getAPY(ISavingsVaultViewer _savingsVault) external view returns (uint) {
+        uint16 currencyId = _savingsVault.currencyId();
+        address[2] memory fCashPositions = _savingsVault.getfCashPositions();
+        uint8 supportedMaturities = _savingsVault.SUPPORTED_MATURITIES();
         uint numerator;
         uint denominator;
         for (uint i = 0; i < supportedMaturities; i++) {
             IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions[i]);
-            uint fCashBalance = fCashPosition.balanceOf(address(_FRP));
+            uint fCashBalance = fCashPosition.balanceOf(address(_savingsVault));
             if (!fCashPosition.hasMatured() && fCashBalance != 0) {
                 // settlement date is the same for 3 and 6 month markets since they both settle at the same time.
                 // 3 month market matures while 6 month market rolls to become a 3 month market.
-                MarketParameters memory marketParameters = NotionalViews(_FRP.notionalRouter()).getMarket(
+                MarketParameters memory marketParameters = NotionalViews(_savingsVault.notionalRouter()).getMarket(
                     currencyId,
                     fCashPosition.getMaturity(),
                     DateTime.getReferenceTime(block.timestamp) + Constants.QUARTER
@@ -48,9 +48,9 @@ contract FRPViews is IFRPViews {
         }
     }
 
-    /// @inheritdoc IFRPViews
+    /// @inheritdoc ISavingsVaultViews
     function scaleAmount(
-        address _frp,
+        address _savingsVault,
         uint _amount,
         uint _percentage,
         uint _steps
@@ -60,7 +60,7 @@ contract FRPViews is IFRPViews {
             uint32 minImpliedRate,
             uint16 currencyId,
             INotionalV2 calculationViews
-        ) = getHighestYieldMarketParameters(_frp);
+        ) = getHighestYieldMarketParameters(_savingsVault);
         (uint fCashAmount, , ) = calculationViews.getfCashLendFromDeposit(
             currencyId,
             _amount,
@@ -93,11 +93,11 @@ contract FRPViews is IFRPViews {
         return 0;
     }
 
-    /// @inheritdoc IFRPViews
-    function getMaxDepositedAmount(address _frp) public view returns (uint maxDepositedAmount) {
-        maxDepositedAmount += IERC4626Upgradeable(IERC4626Upgradeable(_frp).asset()).balanceOf(_frp);
-        address[2] memory fCashPositions = IFRPViewer(_frp).getfCashPositions();
-        uint8 supportedMaturities = IFRPViewer(_frp).SUPPORTED_MATURITIES();
+    /// @inheritdoc ISavingsVaultViews
+    function getMaxDepositedAmount(address _savingsVault) public view returns (uint maxDepositedAmount) {
+        maxDepositedAmount += IERC4626Upgradeable(IERC4626Upgradeable(_savingsVault).asset()).balanceOf(_savingsVault);
+        address[2] memory fCashPositions = ISavingsVaultViewer(_savingsVault).getfCashPositions();
+        uint8 supportedMaturities = ISavingsVaultViewer(_savingsVault).SUPPORTED_MATURITIES();
         for (uint i = 0; i < supportedMaturities; i++) {
             IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions[i]);
             if (fCashPosition.hasMatured()) {
@@ -109,8 +109,8 @@ contract FRPViews is IFRPViews {
         }
     }
 
-    /// @inheritdoc IFRPViews
-    function getHighestYieldMarketParameters(address _frp)
+    /// @inheritdoc ISavingsVaultViews
+    function getHighestYieldMarketParameters(address _savingsVault)
         public
         view
         returns (
@@ -120,10 +120,14 @@ contract FRPViews is IFRPViews {
             INotionalV2 calculationViews
         )
     {
-        (, IFRPVault.NotionalMarket memory highestYieldMarket) = IFRPHarvester(_frp).sortMarketsByOracleRate();
+        (, ISavingsVault.NotionalMarket memory highestYieldMarket) = ISavingsVaultHarvester(_savingsVault)
+            .sortMarketsByOracleRate();
         maturity = highestYieldMarket.maturity;
-        minImpliedRate = uint32((highestYieldMarket.oracleRate * IFRPViewer(_frp).maxLoss()) / IFRPViewer(_frp).BP());
-        currencyId = IFRPViewer(_frp).currencyId();
-        calculationViews = INotionalV2(IFRPViewer(_frp).notionalRouter());
+        minImpliedRate = uint32(
+            (highestYieldMarket.oracleRate * ISavingsVaultViewer(_savingsVault).maxLoss()) /
+                ISavingsVaultViewer(_savingsVault).BP()
+        );
+        currencyId = ISavingsVaultViewer(_savingsVault).currencyId();
+        calculationViews = INotionalV2(ISavingsVaultViewer(_savingsVault).notionalRouter());
     }
 }

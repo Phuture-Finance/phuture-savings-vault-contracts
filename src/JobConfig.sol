@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 
 import "openzeppelin-contracts/contracts/access/Ownable.sol";
 
-import "./interfaces/IFRPViews.sol";
+import "./interfaces/ISavingsVaultViews.sol";
 import "./interfaces/IJobConfig.sol";
 import "./external/notional/interfaces/INotionalV2.sol";
 
@@ -14,16 +14,16 @@ contract JobConfig is IJobConfig, Ownable {
     /// @notice Harvesting amount specification
     HarvestingSpecification internal harvestingSpecification;
     /// @inheritdoc IJobConfig
-    address public frpViews;
+    address public savingsVaultViews;
 
-    constructor(address _frpViews) {
-        frpViews = _frpViews;
+    constructor(address _savingsVaultViews) {
+        savingsVaultViews = _savingsVaultViews;
         harvestingSpecification = HarvestingSpecification.SCALED_AMOUNT;
     }
 
     /// @inheritdoc IJobConfig
-    function setFrpViews(address _frpViews) external onlyOwner {
-        frpViews = _frpViews;
+    function setSavingsVaultViews(address _savingsVaultViews) external onlyOwner {
+        savingsVaultViews = _savingsVaultViews;
     }
 
     /// @inheritdoc IJobConfig
@@ -32,17 +32,17 @@ contract JobConfig is IJobConfig, Ownable {
     }
 
     /// @inheritdoc IJobConfig
-    function getDepositedAmount(address _frp) external view returns (uint) {
+    function getDepositedAmount(address _savingsVault) external view returns (uint) {
         if (harvestingSpecification == HarvestingSpecification.MAX_AMOUNT) {
             return type(uint).max;
         } else if (harvestingSpecification == HarvestingSpecification.MAX_DEPOSITED_AMOUNT) {
-            return IFRPViews(frpViews).getMaxDepositedAmount(_frp);
+            return ISavingsVaultViews(savingsVaultViews).getMaxDepositedAmount(_savingsVault);
         } else if (harvestingSpecification == HarvestingSpecification.SCALED_AMOUNT) {
-            uint amount = IFRPViews(frpViews).getMaxDepositedAmount(_frp);
+            uint amount = ISavingsVaultViews(savingsVaultViews).getMaxDepositedAmount(_savingsVault);
             if (amount == 0) {
                 return amount;
             }
-            return IFRPViews(frpViews).scaleAmount(_frp, amount, 30, 3);
+            return ISavingsVaultViews(savingsVaultViews).scaleAmount(_savingsVault, amount, 30, 3);
         } else {
             return 0;
         }

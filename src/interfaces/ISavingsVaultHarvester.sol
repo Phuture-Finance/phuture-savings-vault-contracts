@@ -2,11 +2,11 @@
 
 pragma solidity 0.8.13;
 
-import "./IFRPVault.sol";
+import "./ISavingsVault.sol";
 
-/// @title Fixed rate product vault harvesting interface
+/// @title Savings vault harvesting interface
 /// @notice Describes functions for harvesting logic
-interface IFRPHarvester {
+interface ISavingsVaultHarvester {
     /// @notice Exchanges all the available assets into the highest yielding maturity
     /// @param _maxDepositedAmount Max amount of asset to deposit to Notional
     function harvest(uint _maxDepositedAmount) external;
@@ -37,5 +37,8 @@ interface IFRPHarvester {
     function sortMarketsByOracleRate()
         external
         view
-        returns (IFRPVault.NotionalMarket memory lowestYieldMarket, IFRPVault.NotionalMarket memory highestYieldMarket);
+        returns (
+            ISavingsVault.NotionalMarket memory lowestYieldMarket,
+            ISavingsVault.NotionalMarket memory highestYieldMarket
+        );
 }

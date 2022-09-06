@@ -20,16 +20,16 @@ interface IJobConfig {
     /// @return returns harvesting specification
     function getHarvestingSpecification(uint _index) external returns (HarvestingSpecification);
 
-    /// @notice Sets FRPViews contract
-    /// @param _frpViews Address of the FRPViews
-    function setFrpViews(address _frpViews) external;
+    /// @notice Sets SavingsVaultViews contract
+    /// @param _savingsVaultViews Address of the SavingsVaultViews
+    function setSavingsVaultViews(address _savingsVaultViews) external;
 
     /// @notice Calculates the deposited amount based on the specification
-    /// @param _frp Address of the FRP
+    /// @param _savingsVault Address of the SavingsVault
     /// @return amount Amount possible to harvest
-    function getDepositedAmount(address _frp) external view returns (uint amount);
+    function getDepositedAmount(address _savingsVault) external view returns (uint amount);
 
-    /// @notice Address of the FRPViews contract
-    /// @return Returns address of the FRPViews contract
-    function frpViews() external view returns (address);
+    /// @notice Address of the SavingsVaultViews contract
+    /// @return Returns address of the SavingsVaultViews contract
+    function savingsVaultViews() external view returns (address);
 }

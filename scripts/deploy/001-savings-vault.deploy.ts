@@ -1,9 +1,9 @@
-import { ERC1967Proxy__factory, FRPVault__factory } from '../../typechain-types'
+import { ERC1967Proxy__factory, SavingsVault__factory } from '../../typechain-types'
 import { parseBigNumber, parseEthAddress, parseString, parseWallet } from '../../utils/parser'
 import { deploy, logger } from '../utils'
 
 async function main() {
-  logger.logTitle('Deploy FRPVault')
+  logger.logTitle('Deploy SavingsVault')
 
   const deployer = parseWallet('PRIVATE_KEY')
   const {
@@ -35,12 +35,16 @@ async function main() {
     gasLimitProxy: parseBigNumber('GAS_LIMIT_PROXY', 6).toString()
   })
 
-  const { contract: impl } = await deploy.withVerification('FRPVault implementation', new FRPVault__factory(deployer), {
-    gasPrice,
-    gasLimit: gasLimitImpl
-  })
+  const { contract: impl } = await deploy.withVerification(
+    'SavingsVault implementation',
+    new SavingsVault__factory(deployer),
+    {
+      gasPrice,
+      gasLimit: gasLimitImpl
+    }
+  )
 
-  const data = new FRPVault__factory().interface.encodeFunctionData('initialize', [
+  const data = new SavingsVault__factory().interface.encodeFunctionData('initialize', [
     name,
     symbol,
     asset,
@@ -51,7 +55,7 @@ async function main() {
     feeRecipient,
     timeout
   ])
-  await deploy.withVerification('FRPVault proxy', new ERC1967Proxy__factory(deployer), impl.address, data, {
+  await deploy.withVerification('SavingsVault proxy', new ERC1967Proxy__factory(deployer), impl.address, data, {
     gasPrice,
     gasLimit: gasLimitProxy
   })

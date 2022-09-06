@@ -8,7 +8,7 @@ import "openzeppelin-contracts/contracts/access/Ownable.sol";
 import "./interfaces/IKeeper3r.sol";
 import "./external/interfaces/IKeep3r.sol";
 import "./interfaces/IHarvestingJob.sol";
-import "./interfaces/IFRPHarvester.sol";
+import "./interfaces/ISavingsVaultHarvester.sol";
 import "./interfaces/IJobConfig.sol";
 import "./interfaces/IPhutureJob.sol";
 
@@ -50,7 +50,7 @@ contract PhutureJob is IPhutureJob, IKeeper3r, IHarvestingJob, Pausable, Ownable
     }
 
     /// @inheritdoc IHarvestingJob
-    function harvest(IFRPHarvester _vault) external override whenNotPaused payKeeper(msg.sender) {
+    function harvest(ISavingsVaultHarvester _vault) external override whenNotPaused payKeeper(msg.sender) {
         require(_vault.canHarvest(), "PhutureJob:TIMEOUT");
         uint depositedAmount = IJobConfig(jobConfig).getDepositedAmount(address(_vault));
         _vault.harvest(depositedAmount);

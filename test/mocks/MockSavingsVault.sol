@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity =0.8.13;
 
-import "../../src/FRPVault.sol";
+import "../../src/SavingsVault.sol";
 import "openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
 
-contract MockFrpVault is FRPVault {
+contract MockSavingsVault is SavingsVault {
     function _lastTransferTime() public view returns (uint96) {
         return lastTransferTime;
     }

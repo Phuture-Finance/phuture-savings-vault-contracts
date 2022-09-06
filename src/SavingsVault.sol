@@ -18,17 +18,17 @@ import "./external/notional/lib/DateTime.sol";
 import "./external/notional/interfaces/IWrappedfCashFactory.sol";
 import { IWrappedfCashComplete } from "./external/notional/interfaces/IWrappedfCash.sol";
 import "./external/notional/lib/Constants.sol";
-import "./interfaces/IFRPVault.sol";
+import "./interfaces/ISavingsVault.sol";
 import "./libraries/AUMCalculationLibrary.sol";
-import "./interfaces/IFRPHarvester.sol";
-import "./interfaces/IFRPViewer.sol";
+import "./interfaces/ISavingsVaultHarvester.sol";
+import "./interfaces/ISavingsVaultViewer.sol";
 
-/// @title Fixed rate product vault
+/// @title Savings vault
 /// @notice Contains logic for integration with Notional protocol
-contract FRPVault is
-    IFRPVault,
-    IFRPHarvester,
-    IFRPViewer,
+contract SavingsVault is
+    ISavingsVault,
+    ISavingsVaultHarvester,
+    ISavingsVaultViewer,
     ERC4626Upgradeable,
     ERC20PermitUpgradeable,
     AccessControlUpgradeable,
@@ -45,28 +45,28 @@ contract FRPVault is
     /// @notice Role for keep3r job contract
     bytes32 internal constant HARVESTER_ROLE = keccak256("HARVESTER_ROLE");
 
-    /// @inheritdoc IFRPViewer
+    /// @inheritdoc ISavingsVaultViewer
     uint8 public constant SUPPORTED_MATURITIES = 2;
-    /// @inheritdoc IFRPViewer
+    /// @inheritdoc ISavingsVaultViewer
     uint16 public constant BP = 10_000;
-    /// @inheritdoc IFRPViewer
+    /// @inheritdoc ISavingsVaultViewer
     uint public constant AUM_SCALED_PER_SECONDS_RATE = 1000000000318694059332284764;
-    /// @inheritdoc IFRPViewer
+    /// @inheritdoc ISavingsVaultViewer
     uint public constant MINTING_FEE_IN_BP = 20;
-    /// @inheritdoc IFRPViewer
+    /// @inheritdoc ISavingsVaultViewer
     uint public constant BURNING_FEE_IN_BP = 50;
 
-    /// @inheritdoc IFRPHarvester
+    /// @inheritdoc ISavingsVaultHarvester
     uint32 public timeout;
-    /// @inheritdoc IFRPViewer
+    /// @inheritdoc ISavingsVaultViewer
     uint16 public currencyId;
-    /// @notice IFRPViewer
+    /// @notice ISavingsVaultViewer
     uint16 public maxLoss;
-    /// @inheritdoc IFRPViewer
+    /// @inheritdoc ISavingsVaultViewer
     address public notionalRouter;
-    /// @inheritdoc IFRPViewer
+    /// @inheritdoc ISavingsVaultViewer
     IWrappedfCashFactory public wrappedfCashFactory;
-    /// @inheritdoc IFRPHarvester
+    /// @inheritdoc ISavingsVaultHarvester
     uint96 public lastHarvest;
     /// @notice 3 and 6 months maturities
     address[2] internal fCashPositions;
@@ -78,7 +78,7 @@ contract FRPVault is
 
     /// @notice Checks if max loss is within an acceptable range
     modifier isValidMaxLoss(uint16 _maxLoss) {
-        require(_maxLoss <= BP, "FRPVault: MAX_LOSS");
+        require(_maxLoss <= BP, "SavingsVault: MAX_LOSS");
         _;
     }
 
@@ -87,7 +87,7 @@ contract FRPVault is
         _disableInitializers();
     }
 
-    /// @inheritdoc IFRPVault
+    /// @inheritdoc ISavingsVault
     function initialize(
         string memory _name,
         string memory _symbol,
@@ -131,7 +131,7 @@ contract FRPVault is
         fCashPositions[1] = highestYieldFCash;
     }
 
-    /// @inheritdoc IFRPHarvester
+    /// @inheritdoc ISavingsVaultHarvester
     function harvest(uint _maxDepositedAmount) external nonReentrant {
         _redeemAssetsIfMarketMatured();
 
@@ -167,22 +167,22 @@ contract FRPVault is
         emit FCashMinted(IWrappedfCashComplete(highestYieldfCash), deposited, fCashAmount);
     }
 
-    /// @inheritdoc IFRPVault
+    /// @inheritdoc ISavingsVault
     function setMaxLoss(uint16 _maxLoss) external onlyRole(VAULT_MANAGER_ROLE) isValidMaxLoss(_maxLoss) {
         maxLoss = _maxLoss;
     }
 
-    /// @inheritdoc IFRPHarvester
+    /// @inheritdoc ISavingsVaultHarvester
     function setTimeout(uint32 _timeout) external onlyRole(VAULT_MANAGER_ROLE) {
         timeout = _timeout;
     }
 
-    /// @inheritdoc IFRPHarvester
+    /// @inheritdoc ISavingsVaultHarvester
     function setLastHarvest(uint96 _lastHarvest) external onlyRole(HARVESTER_ROLE) {
         lastHarvest = _lastHarvest;
     }
 
-    /// @inheritdoc IFRPViewer
+    /// @inheritdoc ISavingsVaultViewer
     function getfCashPositions() external view returns (address[2] memory) {
         return fCashPositions;
     }
@@ -193,7 +193,7 @@ contract FRPVault is
         address _receiver,
         address _owner
     ) public override returns (uint256) {
-        require(_assets <= maxWithdraw(_owner), "FRPVault: withdraw more than max");
+        require(_assets <= maxWithdraw(_owner), "SavingsVault: withdraw more than max");
         // determine the amount of shares for the assets without the fees
         uint shares = _convertToShares(_assets, MathUpgradeable.Rounding.Up);
         // determine the burning fee on top of the estimated shares for withdrawing the exact asset output
@@ -218,7 +218,7 @@ contract FRPVault is
         address _receiver,
         address _owner
     ) public override returns (uint256) {
-        require(_shares <= maxRedeem(_owner), "FRPVault: redeem more than max");
+        require(_shares <= maxRedeem(_owner), "SavingsVault: redeem more than max");
         // input shares equal to _shares = sharesToBurn + sharesToBurn * burning_fee.
         // By solving the equation for sharesToBurn we can calculate the fee by subtracting sharesToBurn from the input _shares
         uint sharesToBurn = (_shares * BP) / (BP + BURNING_FEE_IN_BP);
@@ -239,7 +239,7 @@ contract FRPVault is
 
     /// @inheritdoc ERC4626Upgradeable
     function mint(uint256 _shares, address receiver) public override returns (uint256) {
-        require(_shares <= maxMint(receiver), "FRPVault: mint more than max");
+        require(_shares <= maxMint(receiver), "SavingsVault: mint more than max");
 
         uint256 assets = _convertToAssets(_shares, MathUpgradeable.Rounding.Up);
 
@@ -257,7 +257,7 @@ contract FRPVault is
 
     /// @inheritdoc ERC4626Upgradeable
     function deposit(uint256 _assets, address _receiver) public override returns (uint256) {
-        require(_assets <= maxDeposit(_receiver), "FRPVault: deposit more than max");
+        require(_assets <= maxDeposit(_receiver), "SavingsVault: deposit more than max");
         // calculate the shares to mint
         uint shares = convertToShares(_assets);
         uint fee = (shares * MINTING_FEE_IN_BP) / (BP + MINTING_FEE_IN_BP);
@@ -270,7 +270,7 @@ contract FRPVault is
         return shares - fee;
     }
 
-    /// @inheritdoc IFRPVault
+    /// @inheritdoc ISavingsVault
     function depositWithPermit(
         uint256 _assets,
         address _receiver,
@@ -331,12 +331,12 @@ contract FRPVault is
         return assetBalance;
     }
 
-    /// @inheritdoc IFRPHarvester
+    /// @inheritdoc ISavingsVaultHarvester
     function canHarvest() public view returns (bool) {
         return block.timestamp - lastHarvest >= timeout;
     }
 
-    /// @inheritdoc IFRPHarvester
+    /// @inheritdoc ISavingsVaultHarvester
     function sortMarketsByOracleRate()
         public
         view
@@ -558,7 +558,7 @@ contract FRPVault is
             );
             marketCount++;
         }
-        require(marketCount == SUPPORTED_MATURITIES, "FRPVault: NOTIONAL_MARKETS");
+        require(marketCount == SUPPORTED_MATURITIES, "SavingsVault: NOTIONAL_MARKETS");
         return markets;
     }
 
@@ -568,7 +568,7 @@ contract FRPVault is
     /// @notice Safe downcast from uint256 to uint88
     /// @param _x value to downcast
     function _safeUint88(uint256 _x) internal pure returns (uint88) {
-        require(_x <= uint256(type(uint88).max), "FRPVault: OVERFLOW");
+        require(_x <= uint256(type(uint88).max), "SavingsVault: OVERFLOW");
         return uint88(_x);
     }
 

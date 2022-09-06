@@ -5,9 +5,9 @@ pragma solidity 0.8.13;
 import "../external/notional/interfaces/IWrappedfCashFactory.sol";
 import { IWrappedfCashComplete } from "../external/notional/interfaces/IWrappedfCash.sol";
 
-/// @title Fixed rate product vault interface
+/// @title Savings vault interface
 /// @notice Describes functions for setting the vault state
-interface IFRPVault {
+interface ISavingsVault {
     struct NotionalMarket {
         uint maturity;
         uint oracleRate;
@@ -30,7 +30,7 @@ interface IFRPVault {
     /// @param _fCashAmount Amount of fCash redeemed / burned
     event FCashRedeemed(IWrappedfCashComplete indexed _fCashPosition, uint _assetAmount, uint _fCashAmount);
 
-    /// @notice Initializes FrpVault
+    /// @notice Initializes SavingsVault
     /// @param _name Name of the vault
     /// @param _symbol Symbol of the vault
     /// @param _asset Underlying asset which the vault holds
@@ -57,14 +57,14 @@ interface IFRPVault {
     /// @param _maxLoss Maximum loss allowed
     function setMaxLoss(uint16 _maxLoss) external;
 
-    /// @notice Mints frp in exchange for assets withdrawn from the sender
+    /// @notice Mints savings vault shares in exchange for assets withdrawn from the sender
     /// @param _assets Amount of assets to deposit
     /// @param _receiver Address which receives the minted shares
     /// @param _deadline Maximum unix timestamp at which the signature is still valid
     /// @param _v Last byte of the signed data
     /// @param _r The first 64 bytes of the signed data
     /// @param _s Bytes [64…128] of the signed data
-    /// @return Amount of frp shares to be minted for the given assets
+    /// @return Amount of savings vault shares to be minted for the given assets
     function depositWithPermit(
         uint256 _assets,
         address _receiver,

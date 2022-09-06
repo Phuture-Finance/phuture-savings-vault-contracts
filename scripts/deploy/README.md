@@ -7,7 +7,7 @@
 
 ## Deployment scripts
 
-### 1. Deploy FRPVault implementation and proxy contracts
+### 1. Deploy SavingsVault implementation and proxy contracts
 
 - `NAME` - name of the ERC4626 vault
 - `SYMBOL` - symbol of the ERC4626 vault
@@ -24,5 +24,5 @@
 - `GAS_LIMIT_PROXY` - gas limit for proxy deployment and initialization
 
 ```shell
-GAS_PRICE_GWEI={GAS_PRICE_GWEI} name={NAME} symbol={SYMBOL} asset={ASSET} currencyId={CURRENCY_ID} wrappedfCashFactory={WRAPPED_FCASH_FACTORY} notionalRouter={NOTIONAL_ROUTER} maxLoss={MAX_LOSS} feeRecipient={FEE_RECIPIENT} timeout={TIMEOUT} gasLimitImpl={GAS_LIMIT_IMPLEMENTATION} gasLimitProxy={GAS_LIMIT_PROXY} npx hardhat run --network {NETWORK} scripts/deploy/001-frp-vault.deploy.ts 
+GAS_PRICE_GWEI={GAS_PRICE_GWEI} name={NAME} symbol={SYMBOL} asset={ASSET} currencyId={CURRENCY_ID} wrappedfCashFactory={WRAPPED_FCASH_FACTORY} notionalRouter={NOTIONAL_ROUTER} maxLoss={MAX_LOSS} feeRecipient={FEE_RECIPIENT} timeout={TIMEOUT} gasLimitImpl={GAS_LIMIT_IMPLEMENTATION} gasLimitProxy={GAS_LIMIT_PROXY} npx hardhat run --network {NETWORK} scripts/deploy/001-savings-vault.deploy.ts 
 ```

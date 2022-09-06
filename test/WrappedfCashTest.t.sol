@@ -8,7 +8,7 @@ import "../src/external/notional/wfCashERC4626.sol";
 import "../src/external/notional/proxy/WrappedfCashFactory.sol";
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/IERC20Upgradeable.sol";
-import "../src/FRPVault.sol";
+import "../src/SavingsVault.sol";
 
 contract WrappedfCashTest is Test {
     using stdStorage for StdStorage;

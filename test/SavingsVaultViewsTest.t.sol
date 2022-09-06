@@ -12,12 +12,12 @@ import "../src/external/notional/proxy/WrappedfCashFactory.sol";
 import "openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "openzeppelin-contracts/contracts/utils/Address.sol";
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
-import "./mocks/MockFrpVault.sol";
+import "./mocks/MockSavingsVault.sol";
 import "openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import "../src/interfaces/IFRPVault.sol";
-import "../src/FRPViews.sol";
+import "../src/interfaces/ISavingsVault.sol";
+import "../src/SavingsVaultViews.sol";
 
-contract FrpViewsTest is Test {
+contract SavingsVaultViewsTest is Test {
     using stdStorage for StdStorage;
     using Address for address;
 
@@ -29,9 +29,9 @@ contract FrpViewsTest is Test {
     address usdcWhale = address(0x0A59649758aa4d66E25f08Dd01271e891fe52199);
     ERC20Upgradeable usdc = ERC20Upgradeable(address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48));
 
-    MockFrpVault FRPVaultImpl;
-    MockFrpVault FRPVaultProxy;
-    FRPViews views;
+    MockSavingsVault SavingsVaultImpl;
+    MockSavingsVault SavingsVaultProxy;
+    SavingsVaultViews views;
     address wrappedfCashFactory;
     address feeRecipient;
 
@@ -47,13 +47,13 @@ contract FrpViewsTest is Test {
         upgradeNotionalProxy();
         wrappedfCashFactory = address(deployfCashFactory());
         feeRecipient = address(0xABCD);
-        FRPVaultImpl = new MockFrpVault();
-        FRPVaultProxy = MockFrpVault(
+        SavingsVaultImpl = new MockSavingsVault();
+        SavingsVaultProxy = MockSavingsVault(
             address(
                 new ERC1967Proxy(
-                    address(FRPVaultImpl),
+                    address(SavingsVaultImpl),
                     abi.encodeWithSelector(
-                        FRPVaultImpl.initialize.selector,
+                        SavingsVaultImpl.initialize.selector,
                         name,
                         symbol,
                         address(usdc),
@@ -69,28 +69,28 @@ contract FrpViewsTest is Test {
         );
         // Default msg.sender inside all functions is: 0x00a329c0648769a73afac7f9381e08fb43dbea72,
         // msg.sender inside setUp is 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38
-        FRPVaultProxy.grantRole(keccak256("VAULT_MANAGER_ROLE"), msg.sender);
-        FRPVaultProxy.grantRole(keccak256("HARVESTER_ROLE"), msg.sender);
-        FRPVaultProxy.grantRole(keccak256("HARVESTER_ROLE"), usdcWhale);
-        FRPVaultProxy.grantRole(keccak256("VAULT_MANAGER_ROLE"), usdcWhale);
-        views = new FRPViews();
+        SavingsVaultProxy.grantRole(keccak256("VAULT_MANAGER_ROLE"), msg.sender);
+        SavingsVaultProxy.grantRole(keccak256("HARVESTER_ROLE"), msg.sender);
+        SavingsVaultProxy.grantRole(keccak256("HARVESTER_ROLE"), usdcWhale);
+        SavingsVaultProxy.grantRole(keccak256("VAULT_MANAGER_ROLE"), usdcWhale);
+        views = new SavingsVaultViews();
 
         vm.startPrank(usdcWhale);
-        usdc.approve(address(FRPVaultProxy), type(uint).max);
+        usdc.approve(address(SavingsVaultProxy), type(uint).max);
     }
 
     function testAPY() public {
-        FRPVaultProxy.deposit(100 * 1e6, usdcWhale);
-        assertEq(views.getAPY(FRPVaultProxy), 0);
+        SavingsVaultProxy.deposit(100 * 1e6, usdcWhale);
+        assertEq(views.getAPY(SavingsVaultProxy), 0);
 
-        FRPVaultProxy.harvest(type(uint).max);
+        SavingsVaultProxy.harvest(type(uint).max);
 
         // apy after investing into first maturity
-        assertEq(views.getAPY(FRPVaultProxy), 42173528);
-        vm.warp(block.timestamp + FRPVaultProxy.timeout() + 1);
+        assertEq(views.getAPY(SavingsVaultProxy), 42173528);
+        vm.warp(block.timestamp + SavingsVaultProxy.timeout() + 1);
 
-        FRPVaultProxy.deposit(500 * 1e6, usdcWhale);
-        IFRPVault.NotionalMarket[] memory markets = FRPVaultProxy.__getThreeAndSixMonthMarkets();
+        SavingsVaultProxy.deposit(500 * 1e6, usdcWhale);
+        ISavingsVault.NotionalMarket[] memory markets = SavingsVaultProxy.__getThreeAndSixMonthMarkets();
         MarketParameters[] memory mockedMarkets = new MarketParameters[](2);
         mockedMarkets[0] = getNotionalMarketParameters(markets[0].maturity, markets[1].oracleRate);
         mockedMarkets[1] = getNotionalMarketParameters(markets[1].maturity, markets[0].oracleRate);
@@ -99,29 +99,29 @@ contract FrpViewsTest is Test {
             abi.encodeWithSelector(NotionalViews.getActiveMarkets.selector, currencyId),
             abi.encode(mockedMarkets)
         );
-        FRPVaultProxy.harvest(type(uint).max);
+        SavingsVaultProxy.harvest(type(uint).max);
 
         // apy after investing into second maturity
-        assertEq(views.getAPY(FRPVaultProxy), 37265026);
+        assertEq(views.getAPY(SavingsVaultProxy), 37265026);
 
         // set time to 1 day before maturity
         vm.warp(markets[0].maturity - 86400);
-        assertEq(views.getAPY(FRPVaultProxy), 37264168);
+        assertEq(views.getAPY(SavingsVaultProxy), 37264168);
 
         // set time to 1 day after maturity
         vm.warp(markets[0].maturity + 3600);
         NotionalProxy(notionalRouter).initializeMarkets(currencyId, false);
 
-        assertEq(views.getAPY(FRPVaultProxy), 42173271);
+        assertEq(views.getAPY(SavingsVaultProxy), 42173271);
     }
 
     function testMaxDepositedAmount() public {
         uint amount = 100 * 1e6;
-        FRPVaultProxy.deposit(amount, usdcWhale);
-        assertEq(views.getMaxDepositedAmount(address(FRPVaultProxy)), amount);
+        SavingsVaultProxy.deposit(amount, usdcWhale);
+        assertEq(views.getMaxDepositedAmount(address(SavingsVaultProxy)), amount);
 
-        FRPVaultProxy.harvest(type(uint).max);
-        assertEq(views.getMaxDepositedAmount(address(FRPVaultProxy)), 0);
+        SavingsVaultProxy.harvest(type(uint).max);
+        assertEq(views.getMaxDepositedAmount(address(SavingsVaultProxy)), 0);
     }
 
     // Internal helper functions for setting-up the system

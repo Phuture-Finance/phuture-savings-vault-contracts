@@ -70,7 +70,7 @@ const config: HardhatUserConfig = {
       },
       blockGasLimit: 30_000_000
     },
-    frp: {
+    savings_vault: {
       url: 'https://chain.frp.phuture.finance/',
       timeout: 100_000_000
     },
