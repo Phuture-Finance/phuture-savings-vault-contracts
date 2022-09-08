@@ -1,6 +1,6 @@
-PhutureJobTest:testCannotHarvest() (gas: 238745)
+PhutureJobTest:testCannotHarvest() (gas: 2042544)
 PhutureJobTest:testInitialization() (gas: 15765)
-PhutureJobTest:testScaledAmount() (gas: 3177610)
+PhutureJobTest:testScaledAmount() (gas: 3203936)
 SavingsVaultTest:testAssetWithDifferentDecimals() (gas: 6812748)
 SavingsVaultTest:testCannotInitializeWithInvalidMaxLoss() (gas: 107053)
 SavingsVaultTest:testCannotReInitializeExistingVault() (gas: 31459)

@@ -53,6 +53,7 @@ contract PhutureJob is IPhutureJob, IKeeper3r, IHarvestingJob, Pausable, Ownable
     function harvest(ISavingsVaultHarvester _vault) external override whenNotPaused payKeeper(msg.sender) {
         require(_vault.canHarvest(), "PhutureJob:TIMEOUT");
         uint depositedAmount = IJobConfig(jobConfig).getDepositedAmount(address(_vault));
+        require(depositedAmount != 0, "PhutureJob:NOTHING_TO_DEPOSIT");
         _vault.harvest(depositedAmount);
         _vault.setLastHarvest(uint96(block.timestamp));
     }
