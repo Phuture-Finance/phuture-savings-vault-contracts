@@ -25,5 +25,5 @@ interface IHarvestingJob {
     /// @notice Timestamp of last harvest
     /// @param _vault Address of the SavingsVault
     /// @return Returns timestamp of last harvest
-    function lastHarvest(address vault) external view returns (uint96);
+    function lastHarvest(address _vault) external view returns (uint96);
 }
