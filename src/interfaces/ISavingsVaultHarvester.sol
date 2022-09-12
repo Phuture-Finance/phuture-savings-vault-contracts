@@ -15,21 +15,9 @@ interface ISavingsVaultHarvester {
     /// @param _timeout Time between two harvests
     function setTimeout(uint32 _timeout) external;
 
-    /// @notice Sets last harvest time, only executable by Phuture job contract
-    /// @param _lastHarvest Timestamp of last harvest
-    function setLastHarvest(uint96 _lastHarvest) external;
-
     /// @notice Time required to pass between two harvest events
     /// @return Returns timeout
     function timeout() external view returns (uint32);
-
-    /// @notice Timestamp of last harvest
-    /// @return Returns timestamp of last harvest
-    function lastHarvest() external view returns (uint96);
-
-    /// @notice Check if can harvest based on time passed
-    /// @return Returns true if can harvest
-    function canHarvest() external view returns (bool);
 
     /// @notice fetches the latest 3 and 6 month active markets from Notional and sorts them based on oracle rate
     /// @return lowestYieldMarket lowest yield market

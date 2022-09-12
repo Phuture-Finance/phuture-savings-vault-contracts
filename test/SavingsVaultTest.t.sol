@@ -73,7 +73,6 @@ contract SavingsVaultTest is Test {
         // Default msg.sender inside all functions is: 0x00a329c0648769a73afac7f9381e08fb43dbea72,
         // msg.sender inside setUp is 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38
         SavingsVaultProxy.grantRole(keccak256("VAULT_MANAGER_ROLE"), msg.sender);
-        SavingsVaultProxy.grantRole(keccak256("HARVESTER_ROLE"), msg.sender);
         SavingsVaultProxy.grantRole(keccak256("VAULT_MANAGER_ROLE"), usdcWhale);
     }
 
@@ -95,7 +94,6 @@ contract SavingsVaultTest is Test {
         assertEq(SavingsVaultProxy.maxLoss(), maxLoss);
         assertEq(SavingsVaultProxy._feeRecipient(), feeRecipient);
         assertEq(SavingsVaultProxy._lastTransferTime(), block.timestamp);
-        assertEq(SavingsVaultProxy.lastHarvest(), 0);
 
         address[] memory positions = SavingsVaultProxy._fCashPositions();
         assertEq(positions.length, 2);
@@ -186,7 +184,6 @@ contract SavingsVaultTest is Test {
         vm.expectEmit(true, false, false, true);
         emit FCashMinted(highestYieldFCash, maxDepositedAmount, fCashAmount);
         SavingsVaultProxy.harvest(maxDepositedAmount);
-        assertEq(SavingsVaultProxy.lastHarvest(), 0);
         vm.warp(block.timestamp + SavingsVaultProxy.timeout() + 1);
 
         assertEq(SavingsVaultProxy.totalAssets(), 999561212039);
@@ -800,7 +797,7 @@ contract SavingsVaultTest is Test {
             assertEq(load(cont, i), zeroValue);
         }
 
-        // Next slot is currencyId, maxLoss and notionalRouter inside SavingsVault
+        // Next slot is timeout, currencyId, maxLoss and notionalRouter inside SavingsVault
         assertEq(
             load(address(SavingsVaultProxy), 504),
             0x000000001344a36a1b56144c3bc62e7757377d288fde03692328000300015180

@@ -42,8 +42,6 @@ contract SavingsVault is
     bytes32 internal constant VAULT_ADMIN_ROLE = keccak256("VAULT_ADMIN_ROLE");
     /// @notice Role for vault management
     bytes32 internal constant VAULT_MANAGER_ROLE = keccak256("VAULT_MANAGER_ROLE");
-    /// @notice Role for keep3r job contract
-    bytes32 internal constant HARVESTER_ROLE = keccak256("HARVESTER_ROLE");
 
     /// @inheritdoc ISavingsVaultViewer
     uint8 public constant SUPPORTED_MATURITIES = 2;
@@ -66,11 +64,8 @@ contract SavingsVault is
     address public notionalRouter;
     /// @inheritdoc ISavingsVaultViewer
     IWrappedfCashFactory public wrappedfCashFactory;
-    /// @inheritdoc ISavingsVaultHarvester
-    uint96 public lastHarvest;
     /// @notice 3 and 6 months maturities
     address[2] internal fCashPositions;
-
     /// @notice Timestamp of last AUM fee charge
     uint96 internal lastTransferTime;
     /// @notice Address of the feeRecipient
@@ -102,7 +97,6 @@ contract SavingsVault is
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(VAULT_ADMIN_ROLE, msg.sender);
         _setRoleAdmin(VAULT_MANAGER_ROLE, VAULT_ADMIN_ROLE);
-        _setRoleAdmin(HARVESTER_ROLE, VAULT_ADMIN_ROLE);
 
         __ERC4626_init(IERC20MetadataUpgradeable(_asset));
         __ERC20_init(_name, _symbol);
@@ -175,11 +169,6 @@ contract SavingsVault is
     /// @inheritdoc ISavingsVaultHarvester
     function setTimeout(uint32 _timeout) external onlyRole(VAULT_MANAGER_ROLE) {
         timeout = _timeout;
-    }
-
-    /// @inheritdoc ISavingsVaultHarvester
-    function setLastHarvest(uint96 _lastHarvest) external onlyRole(HARVESTER_ROLE) {
-        lastHarvest = _lastHarvest;
     }
 
     /// @inheritdoc ISavingsVaultViewer
@@ -329,11 +318,6 @@ contract SavingsVault is
             }
         }
         return assetBalance;
-    }
-
-    /// @inheritdoc ISavingsVaultHarvester
-    function canHarvest() public view returns (bool) {
-        return block.timestamp - lastHarvest >= timeout;
     }
 
     /// @inheritdoc ISavingsVaultHarvester

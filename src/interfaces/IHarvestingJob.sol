@@ -16,4 +16,14 @@ interface IHarvestingJob {
     /// @notice Harvests from vault
     /// @param _vault Address of the SavingsVault
     function harvest(ISavingsVaultHarvester _vault) external;
+
+    /// @notice Check if can harvest based on time passed
+    /// @param _vault Address of the SavingsVault
+    /// @return Returns true if can harvest
+    function canHarvest(ISavingsVaultHarvester _vault) external view returns (bool);
+
+    /// @notice Timestamp of last harvest
+    /// @param _vault Address of the SavingsVault
+    /// @return Returns timestamp of last harvest
+    function lastHarvest(address vault) external view returns (uint96);
 }
