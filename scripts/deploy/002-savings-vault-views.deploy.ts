@@ -6,7 +6,7 @@ async function main() {
   logger.logTitle('Deploy SavingsVaultViews')
 
   const deployer = parseWallet('PRIVATE_KEY')
-  const {} = await logger.logInputs.withConfirmation({
+  await logger.logInputs.withConfirmation({
     deployer: deployer.address
   })
   await deploy.withVerification('SavingsVaultViews', new SavingsVaultViews__factory(deployer))

@@ -24,5 +24,27 @@
 - `GAS_LIMIT_PROXY` - gas limit for proxy deployment and initialization
 
 ```shell
-GAS_PRICE_GWEI={GAS_PRICE_GWEI} name={NAME} symbol={SYMBOL} asset={ASSET} currencyId={CURRENCY_ID} wrappedfCashFactory={WRAPPED_FCASH_FACTORY} notionalRouter={NOTIONAL_ROUTER} maxLoss={MAX_LOSS} feeRecipient={FEE_RECIPIENT} timeout={TIMEOUT} gasLimitImpl={GAS_LIMIT_IMPLEMENTATION} gasLimitProxy={GAS_LIMIT_PROXY} npx hardhat run --network {NETWORK} scripts/deploy/001-savings-vault.deploy.ts 
+gasPriceGwei={GAS_PRICE_GWEI} name={NAME} symbol={SYMBOL} asset={ASSET} currencyId={CURRENCY_ID} wrappedfCashFactory={WRAPPED_FCASH_FACTORY} notionalRouter={NOTIONAL_ROUTER} maxLoss={MAX_LOSS} feeRecipient={FEE_RECIPIENT} timeout={TIMEOUT} gasLimitImpl={GAS_LIMIT_IMPLEMENTATION} gasLimitProxy={GAS_LIMIT_PROXY} npx hardhat run --network {NETWORK} scripts/deploy/001-savings-vault.deploy.ts 
+```
+
+### 2. Deploy SavingsVaultViews
+
+```shell
+npx hardhat run --network {NETWORK} scripts/deploy/002-savings-vault-views.deploy.ts 
+```
+
+### 3. Deploy JobConfig
+- `SAVINGS_VAULT_VIEWS` - address of [`SavingsVaultViews`](#1-deploy-savingsvault-implementation-and-proxy-contracts) contract
+
+```shell
+savingsVaultViews={SAVINGS_VAULT_VIEWS} npx hardhat run --network {NETWORK} scripts/deploy/003-phuture-job-config.deploy.ts 
+```
+
+
+### 4. Deploy PhutureJob
+- `KEEPER` - address of [`Keep3r V2`](https://docs.keep3r.network/registry) contract
+- `JOB_CONFIG` - address of [`JobConfig`](#3-deploy-jobconfig) contract
+
+```shell
+keeperAddress={KEEPER} jobConfig={JOB_CONFIG} npx hardhat run --network {NETWORK} scripts/deploy/004-phuture-job.deploy.ts 
 ```

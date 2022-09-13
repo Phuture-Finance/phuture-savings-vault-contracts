@@ -37,10 +37,6 @@ async function main() {
   await transaction('Grant VAULT_MANAGER_ROLE', SavingsVault, 'grantRole', VAULT_MANAGER_ROLE, admin.address)
   await transaction('Grant HARVESTER_ROLE', SavingsVault, 'grantRole', HARVESTER_ROLE, admin.address)
 
-  // const usdcWhale = await impersonate(mainnetConfig.whales.USDC)
-  // await setBalance(usdcWhale.address, expandTo18Decimals(1_000_000))
-  // await transaction('USDC transfer', USDC.connect(usdcWhale), 'transfer', admin.address, expandTo6Decimals(100_000))
-
   // Admin mints SavingsVault
   const usdcAmount = expandTo6Decimals(1000)
   await transaction('Approve USDC for SavingsVault', USDC, 'approve', SavingsVault.address, ethers.constants.MaxUint256)
