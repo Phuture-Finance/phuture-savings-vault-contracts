@@ -171,6 +171,11 @@ contract SavingsVault is
         timeout = _timeout;
     }
 
+    /// @inheritdoc ISavingsVault
+    function setFeeRecipient(address _feeRecipient) external onlyRole(VAULT_MANAGER_ROLE) {
+        feeRecipient = _feeRecipient;
+    }
+
     /// @inheritdoc ISavingsVaultViewer
     function getfCashPositions() external view returns (address[2] memory) {
         return fCashPositions;

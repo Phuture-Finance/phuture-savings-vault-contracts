@@ -62,7 +62,7 @@ async function main() {
   console.table({
     'Lowest Yield Market Bond': {
       address: lowestYieldFCash.address,
-      oracleRate: bnToFormattedString(lowestYieldMarket.oracleRate, 7) + ' %',
+      oracleRate: bnToFormattedString(lowestYieldMarket.oracleRate, 7) + '%',
       maturity: timestampToFormattedTime(lowestYieldMarket.maturity),
       fCashAmount: bnToFormattedString(await lowestYieldFCash.balanceOf(savingsVaultAddress), 8),
       usdcEquivalent: bnToFormattedString(
@@ -72,7 +72,7 @@ async function main() {
     },
     'Highest Yield Market Bond': {
       address: highestYieldFCash.address,
-      oracleRate: bnToFormattedString(highestYieldMarket.oracleRate, 7) + ' %',
+      oracleRate: bnToFormattedString(highestYieldMarket.oracleRate, 7) + '%',
       maturity: timestampToFormattedTime(highestYieldMarket.maturity),
       fCashAmount: bnToFormattedString(await highestYieldFCash.balanceOf(savingsVaultAddress), 8),
       usdcEquivalent: bnToFormattedString(
@@ -84,9 +84,7 @@ async function main() {
   })
 
   logger.info(
-    'Current APY of the vault is: ' +
-      bnToFormattedString(await savingsVaultViews.getAPY(savingsVault.address), 7) +
-      ' %'
+    'Current APY of the vault is: ' + bnToFormattedString(await savingsVaultViews.getAPY(savingsVault.address), 7) + '%'
   )
 }
 

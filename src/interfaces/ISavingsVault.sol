@@ -57,6 +57,10 @@ interface ISavingsVault {
     /// @param _maxLoss Maximum loss allowed
     function setMaxLoss(uint16 _maxLoss) external;
 
+    /// @notice Sets feeRecipient
+    /// @param _feeRecipient Address of new feeRecipient
+    function setFeeRecipient(address _feeRecipient) external;
+
     /// @notice Mints savings vault shares in exchange for assets withdrawn from the sender
     /// @param _assets Amount of assets to deposit
     /// @param _receiver Address which receives the minted shares
