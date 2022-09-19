@@ -842,7 +842,7 @@ contract SavingsVaultTest is Test {
         );
     }
 
-    function testMaxImpliedRateFuzzing(uint16 maxLoss) public {
+    function testMaxImpliedRateFuzzing(uint16 _maxLoss) public {
         vm.assume(maxLoss < 10_000);
         vm.startPrank(usdcWhale);
         SavingsVaultProxy.setMaxLoss(maxLoss);
