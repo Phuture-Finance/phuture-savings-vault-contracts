@@ -24,12 +24,6 @@ interface ISavingsVault {
     /// @param _fCashAmount Amount of fCash minted
     event FCashMinted(IWrappedfCashComplete indexed _fCashPosition, uint _assetAmount, uint _fCashAmount);
 
-    /// @dev Emitted when redeeming fCash during withdrawal
-    /// @param _fCashPosition Address of wrappedFCash token
-    /// @param _assetAmount Amount of asset received
-    /// @param _fCashAmount Amount of fCash redeemed / burned
-    event FCashRedeemed(IWrappedfCashComplete indexed _fCashPosition, uint _assetAmount, uint _fCashAmount);
-
     /// @notice Initializes SavingsVault
     /// @param _name Name of the vault
     /// @param _symbol Symbol of the vault

@@ -277,29 +277,29 @@ contract SavingsVaultTest is Test {
 
         vm.warp(block.timestamp + 1_000);
         SavingsVaultProxy.withdraw(amount / 2, usdcWhale, usdcWhale);
-        assertEq(highestYieldFCash.balanceOf(address(SavingsVaultProxy)), 50160346219823);
-        assertEq(usdc.balanceOf(address(SavingsVaultProxy)), 317);
+        assertEq(highestYieldFCash.balanceOf(address(SavingsVaultProxy)), 50178254919681);
+        assertEq(usdc.balanceOf(address(SavingsVaultProxy)), 0);
         assertEq(SavingsVaultProxy.balanceOf(feeRecipient), 4499137477375791733362);
 
         // withdrawing half of the remaining half
         fCashAmount = highestYieldFCash.previewWithdraw(amount / 4 - usdc.balanceOf(address(SavingsVaultProxy)));
         SavingsVaultProxy.withdraw(amount / 4, usdcWhale, usdcWhale);
 
-        assertEq(highestYieldFCash.balanceOf(address(SavingsVaultProxy)), 25009309676413);
-        assertEq(usdc.balanceOf(address(SavingsVaultProxy)), 324);
-        assertEq(SavingsVaultProxy.balanceOf(feeRecipient), 5750832490637513444127);
+        assertEq(highestYieldFCash.balanceOf(address(SavingsVaultProxy)), 25039032169466);
+        assertEq(usdc.balanceOf(address(SavingsVaultProxy)), 0);
+        assertEq(SavingsVaultProxy.balanceOf(feeRecipient), 5750385759468507102121);
 
         // Redeeming the leftover amount
         SavingsVaultProxy.redeem(SavingsVaultProxy.balanceOf(usdcWhale), usdcWhale, usdcWhale);
         assertEq(SavingsVaultProxy.balanceOf(usdcWhale), 0);
-        assertEq(SavingsVaultProxy.balanceOf(feeRecipient), 6961838090250646297346);
+        assertEq(SavingsVaultProxy.balanceOf(feeRecipient), 6961838090250646297347);
 
         // There is some usdc and fCash amount left in the vault due to difference between oracle and instant rate.
-        assertEq(highestYieldFCash.balanceOf(address(SavingsVaultProxy)), 684658707729);
-        assertEq(usdc.balanceOf(address(SavingsVaultProxy)), 375);
+        assertEq(highestYieldFCash.balanceOf(address(SavingsVaultProxy)), 699362392788);
+        assertEq(usdc.balanceOf(address(SavingsVaultProxy)), 0);
 
         // User losses certain amount of USDC due to slippage
-        assertEq(balanceBeforeDeposit - usdc.balanceOf(usdcWhale), 8241063687);
+        assertEq(balanceBeforeDeposit - usdc.balanceOf(usdcWhale), 8387163064);
     }
 
     function testWithdrawalFuzzing(uint assets) public {
@@ -383,11 +383,11 @@ contract SavingsVaultTest is Test {
             ((maxShares * SavingsVaultProxy.BP()) / (SavingsVaultProxy.BURNING_FEE_IN_BP() + SavingsVaultProxy.BP()));
         uint aumFee = SavingsVaultProxy.getAUMFee(blockTimestamp + 1_000);
 
-        assertEq(SavingsVaultProxy.redeem(maxShares, usdcWhale, usdcWhale), assetAmount);
+        assertGe(SavingsVaultProxy.redeem(maxShares, usdcWhale, usdcWhale), assetAmount);
         // All shares were exchanged for the usdc
         assertEq(SavingsVaultProxy.balanceOf(usdcWhale), 0);
         // The estimated assetAmount with previewRedeem matches the assets received
-        assertEq(usdc.balanceOf(usdcWhale) - assetBalanceBeforeRedeem, assetAmount);
+        assertGe(usdc.balanceOf(usdcWhale) - assetBalanceBeforeRedeem, assetAmount);
 
         // aumFee and burningFee are transferred to the feeRecipient
         assertEq(SavingsVaultProxy.balanceOf(feeRecipient) - feeRecipientBalanceBefore, burningFee + aumFee);
@@ -423,7 +423,7 @@ contract SavingsVaultTest is Test {
         // (it should underestimate if necessary).
         assertEq(SavingsVaultProxy.balanceOf(usdcWhale), 535314264382);
         assertEq(sharesBurned, shares);
-        assertEq(usdc.balanceOf(usdcWhale) - balanceOfUsdcBefore, maxAssetAmount);
+        assertEq(usdc.balanceOf(usdcWhale) - balanceOfUsdcBefore, maxAssetAmount - 56028848);
 
         SavingsVaultProxy.redeem(SavingsVaultProxy.balanceOf(usdcWhale), usdcWhale, usdcWhale);
         assertEq(SavingsVaultProxy.balanceOf(usdcWhale), 0);
@@ -517,20 +517,22 @@ contract SavingsVaultTest is Test {
         uint fee = 250152290415505410775;
         uint sharesBurnt = 50280610373516587565893;
 
-        assertEq(SavingsVaultProxy.previewRedeem(sharesBurnt), assetsToWithdraw - 1);
+        assertEq(SavingsVaultProxy.previewRedeem(sharesBurnt), assetsToWithdraw - 26989708);
         assertEq(SavingsVaultProxy.previewWithdraw(assetsToWithdraw), sharesBurnt);
 
         uint snapshot = vm.snapshot();
 
         SavingsVaultProxy.withdraw(assetsToWithdraw, usdcWhale, usdcWhale);
         assertEq(SavingsVaultProxy.balanceOf(feeRecipient) - feeRecipientBalanceBefore, fee);
-        assertEq(usdc.balanceOf(usdcWhale) - usdcBalanceBefore, assetsToWithdraw);
+        // less assets are withdrawn that estimated due to slippage
+        assertEq(usdc.balanceOf(usdcWhale) - usdcBalanceBefore, assetsToWithdraw - 26989707);
         assertEq(sharesBalanceBefore - SavingsVaultProxy.balanceOf(usdcWhale), sharesBurnt);
 
         vm.revertTo(snapshot);
         SavingsVaultProxy.redeem(sharesBurnt, usdcWhale, usdcWhale);
         assertEq(SavingsVaultProxy.balanceOf(feeRecipient) - feeRecipientBalanceBefore, fee + 1);
-        assertEq(usdc.balanceOf(usdcWhale) - usdcBalanceBefore, assetsToWithdraw - 1);
+        // less assets are withdrawn that estimated due to slippage
+        assertEq(usdc.balanceOf(usdcWhale) - usdcBalanceBefore, assetsToWithdraw - 26989708);
         assertEq(sharesBalanceBefore - SavingsVaultProxy.balanceOf(usdcWhale), sharesBurnt);
 
         vm.stopPrank();
@@ -602,20 +604,16 @@ contract SavingsVaultTest is Test {
         assertEq(usdc.balanceOf(address(SavingsVaultProxy)), 1000000015);
 
         // withdrawing from both maturities
-        vm.expectEmit(true, false, false, true);
-        emit FCashRedeemed(lowestYieldFCash, 9989611150, 1005021519000);
-        vm.expectEmit(true, false, false, true);
-        emit FCashRedeemed(highestYieldFCash, 9811257783, 992990533722);
         SavingsVaultProxy.redeem(SavingsVaultProxy.balanceOf(usdcWhale), usdcWhale, usdcWhale);
 
         assertEq(lowestYieldFCash.balanceOf(address(SavingsVaultProxy)), 0);
-        assertEq(highestYieldFCash.balanceOf(address(SavingsVaultProxy)), 16449938278);
+        assertEq(highestYieldFCash.balanceOf(address(SavingsVaultProxy)), 17744358555);
         assertEq(SavingsVaultProxy.balanceOf(usdcWhale), 0);
-        assertEq(usdc.balanceOf(address(SavingsVaultProxy)), 496);
+        assertEq(usdc.balanceOf(address(SavingsVaultProxy)), 0);
 
         uint balanceAfterWithdrawal = usdc.balanceOf(usdcWhale);
         // User losses certain amount of USDC due to slippage
-        assertEq(balanceBeforeDeposit - balanceAfterWithdrawal, 199131548);
+        assertEq(balanceBeforeDeposit - balanceAfterWithdrawal, 211920397);
 
         vm.stopPrank();
     }
@@ -658,8 +656,8 @@ contract SavingsVaultTest is Test {
 
         uint shares = daiSavingsVault.withdraw(amount / 2, daiWhale, daiWhale);
         assertEq(shares, estimatedShares);
-        assertEq(highestYieldFCash.balanceOf(address(daiSavingsVault)), 505786562906);
-        assertEq(dai.balanceOf(address(daiSavingsVault)), 495319817504388);
+        assertEq(highestYieldFCash.balanceOf(address(daiSavingsVault)), 506450873211);
+        assertEq(dai.balanceOf(address(daiSavingsVault)), 0);
 
         vm.stopPrank();
     }
@@ -842,6 +840,14 @@ contract SavingsVaultTest is Test {
             load(address(SavingsVaultProxy), 508),
             0x000000000000000000000000000000000000abcd000000000000000062d68ebe
         );
+    }
+
+    function testMaxImpliedRateFuzzing(uint16 maxLoss) public {
+        vm.assume(maxLoss < 10_000);
+        vm.startPrank(usdcWhale);
+        SavingsVaultProxy.setMaxLoss(maxLoss);
+        uint maxImpliedRate = SavingsVaultProxy.__getMaxImpliedRate(311111111);
+        vm.stopPrank();
     }
 
     // Notional tests

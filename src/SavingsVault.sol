@@ -201,7 +201,8 @@ contract SavingsVault is
             _chargeAUMFee();
         }
         // shares accounting for the fees are not burned since they are transferred to the feeRecipient
-        _withdraw(msg.sender, _receiver, _owner, _assets, shares);
+        uint assetsWithdrawn = _beforeWithdraw(_assets);
+        _withdraw(msg.sender, _receiver, _owner, assetsWithdrawn, shares);
         // returns the shares plus fee
         return shares + fee;
     }
@@ -226,9 +227,10 @@ contract SavingsVault is
         } else {
             _chargeAUMFee();
         }
-        _withdraw(msg.sender, _receiver, _owner, assets, sharesToBurn);
+        uint assetsWithdrawn = _beforeWithdraw(assets);
+        _withdraw(msg.sender, _receiver, _owner, assetsWithdrawn, sharesToBurn);
 
-        return assets;
+        return assetsWithdrawn;
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -289,7 +291,8 @@ contract SavingsVault is
     /// @inheritdoc IERC4626Upgradeable
     function previewRedeem(uint256 _shares) public view override returns (uint256) {
         // amount of assets received is reduced by the fee amount
-        return convertToAssets((_shares * BP) / (BP + BURNING_FEE_IN_BP));
+        uint assets = convertToAssets((_shares * BP) / (BP + BURNING_FEE_IN_BP));
+        return _previewRedeemFromMaturities(assets);
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -343,18 +346,6 @@ contract SavingsVault is
         }
     }
 
-    /// @inheritdoc ERC4626Upgradeable
-    function _withdraw(
-        address _caller,
-        address _receiver,
-        address _owner,
-        uint _assets,
-        uint _shares
-    ) internal override nonReentrant {
-        _beforeWithdraw(_assets);
-        super._withdraw(_caller, _receiver, _owner, _assets, _shares);
-    }
-
     /// @dev Overrides _transfer to include AUM fee logic
     /// @inheritdoc ERC20Upgradeable
     function _transfer(
@@ -377,114 +368,6 @@ contract SavingsVault is
                 }
             }
         }
-    }
-
-    /// @notice Withdraws asset from maturities
-    /// @param _assets Amount of assets for withdrawal
-    function _beforeWithdraw(uint _assets) internal {
-        IERC20MetadataUpgradeable _asset = IERC20MetadataUpgradeable(asset());
-        if (_asset.balanceOf(address(this)) < _assets) {
-            // (5 * 10**(_asset.decimals() - 4)) is a buffer value to account for inaccurate estimation of fCash needed to withdraw the asset amount needed.
-            // For further details refer to Notional docs: https://docs.notional.finance/developer-documentation/how-to/lend-and-borrow-fcash/wrapped-fcash
-            uint bufferAmount = (5 * 10**(_asset.decimals() - 4));
-            FCashProperties[2] memory sortedfCashPositions = _sortStoredfCashPositions();
-            for (uint i = 0; i < SUPPORTED_MATURITIES; i++) {
-                IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(sortedfCashPositions[i].wrappedfCash);
-                uint fCashAmountAvailable = fCashPosition.balanceOf(address(this));
-                if (fCashAmountAvailable == 0) {
-                    continue;
-                }
-                uint assetBalanceBeforeRedeem = _asset.balanceOf(address(this));
-                uint amountNeeded = _assets + bufferAmount - assetBalanceBeforeRedeem;
-
-                uint fCashAmountNeeded = fCashPosition.previewWithdraw(amountNeeded);
-                uint32 _oracleRate = sortedfCashPositions[i].oracleRate;
-                uint32 maxImpliedRate = _oracleRate != type(uint32).max
-                    ? _oracleRate * ((2 * BP - maxLoss) / BP)
-                    : type(uint32).max;
-                uint fCashAmountBurned = _redeemToUnderlying(
-                    fCashAmountAvailable,
-                    fCashAmountNeeded,
-                    fCashPosition,
-                    maxImpliedRate
-                );
-                uint assetBalanceAfterRedeem = _asset.balanceOf(address(this));
-                emit FCashRedeemed(
-                    fCashPosition,
-                    assetBalanceAfterRedeem - assetBalanceBeforeRedeem,
-                    fCashAmountBurned
-                );
-                if (assetBalanceAfterRedeem >= _assets) {
-                    break;
-                }
-            }
-        }
-    }
-
-    /// @notice Redeems fCash for underlying asset
-    function _redeemToUnderlying(
-        uint fCashAmountAvailable,
-        uint fCashAmountNeeded,
-        IWrappedfCashComplete fCashPosition,
-        uint32 maxOracleRate
-    ) internal returns (uint fCashAmountBurned) {
-        if (fCashAmountAvailable < fCashAmountNeeded) {
-            fCashAmountBurned = fCashAmountAvailable;
-            fCashPosition.redeemToUnderlying(fCashAmountAvailable, address(this), maxOracleRate);
-        } else {
-            fCashAmountBurned = fCashAmountNeeded;
-            fCashPosition.redeemToUnderlying(fCashAmountNeeded, address(this), maxOracleRate);
-        }
-    }
-
-    /// @notice Sorts stored fCash positions in order: matured, lowestYield, highestYield
-    function _sortStoredfCashPositions() internal returns (FCashProperties[2] memory sorted) {
-        address _firstfCashPosition = fCashPositions[0];
-        address _secondfCashPosition = fCashPositions[1];
-        // If one of the fCash positions has matured in between harvesting/withdrawal it means that the other one has rolled and became a 3 month maturity.
-        // We can set max value for oracleRate for the matured fCash since it doesn't matter during redemption.
-        // first position is matured redeem from it first.
-        if (IWrappedfCashComplete(_firstfCashPosition).hasMatured()) {
-            sorted[0] = FCashProperties({ wrappedfCash: _firstfCashPosition, oracleRate: type(uint32).max });
-            MarketParameters memory threeMonthfCash = _getNotionalMarketParameters(_secondfCashPosition);
-            sorted[1] = FCashProperties({
-                wrappedfCash: _secondfCashPosition,
-                oracleRate: uint32(threeMonthfCash.oracleRate)
-            });
-            // second position is matured redeem from it first
-        } else if (IWrappedfCashComplete(_secondfCashPosition).hasMatured()) {
-            sorted[0] = FCashProperties({ wrappedfCash: _secondfCashPosition, oracleRate: type(uint32).max });
-            MarketParameters memory threeMonthfCash = _getNotionalMarketParameters(_firstfCashPosition);
-            sorted[1] = FCashProperties({
-                wrappedfCash: _firstfCashPosition,
-                oracleRate: uint32(threeMonthfCash.oracleRate)
-            });
-            // both positions are still active, we need to fetch the oracle rates and compare it again
-        } else {
-            (
-                NotionalMarket memory lowestYieldMarket,
-                NotionalMarket memory highestYieldMarket
-            ) = sortMarketsByOracleRate();
-            uint16 _currencyId = currencyId;
-            IWrappedfCashFactory _wrappedfCashFactory = wrappedfCashFactory;
-            address lowestYieldfCash = _wrappedfCashFactory.deployWrapper(
-                _currencyId,
-                uint40(lowestYieldMarket.maturity)
-            );
-            address highestYieldfCash = _wrappedfCashFactory.deployWrapper(
-                _currencyId,
-                uint40(highestYieldMarket.maturity)
-            );
-            sorted[0] = FCashProperties({
-                wrappedfCash: lowestYieldfCash,
-                oracleRate: uint32(lowestYieldMarket.oracleRate)
-            });
-            sorted[1] = FCashProperties({
-                wrappedfCash: highestYieldfCash,
-                oracleRate: uint32(highestYieldMarket.oracleRate)
-            });
-        }
-        return sorted;
     }
 
     /// @notice Sorts fCash positions in case there was a change with respect to the previous state
@@ -514,6 +397,179 @@ contract SavingsVault is
                 lastTransferTime = uint96(block.timestamp);
             }
         }
+    }
+
+    /// @notice Withdraws asset from maturities
+    /// @param _assets Amount of assets for withdrawal
+    function _beforeWithdraw(uint _assets) internal returns (uint) {
+        IERC20MetadataUpgradeable _asset = IERC20MetadataUpgradeable(asset());
+        uint assetBalance = _asset.balanceOf(address(this));
+        // There is enough assets in the vault, no need to withdraw from fCash positions
+        if (assetBalance >= _assets) {
+            return _assets;
+        }
+        // Otherwise the amount of assets to withdraw is the difference between the amount of assets in the vault and the amount of assets to withdraw from maturities
+        uint assetsToWithdrawFromMaturities = _assets - assetBalance;
+        FCashProperties[2] memory sortedfCashPositions = _sortStoredfCashPositions();
+        // First try to withdraw from lowest yield maturity
+        FCashProperties memory lowestYieldNotionalMarket = sortedfCashPositions[0];
+        IWrappedfCashComplete lowestYieldFCash = IWrappedfCashComplete(lowestYieldNotionalMarket.wrappedfCash);
+        uint fCashAmountLowestYieldMaturity = lowestYieldFCash.balanceOf(address(this));
+        if (fCashAmountLowestYieldMaturity > 0) {
+            uint32 maxImpliedRate = _getMaxImpliedRate(lowestYieldNotionalMarket.oracleRate);
+            uint valueOfLowestYieldfCash = lowestYieldFCash.convertToAssets(fCashAmountLowestYieldMaturity);
+            if (valueOfLowestYieldfCash >= assetsToWithdrawFromMaturities) {
+                // Amount to withdraw is the percentage of the available lowest yield fCash
+                uint fCashAmountToWithdraw = assetsToWithdrawFromMaturities.mulDiv(
+                    fCashAmountLowestYieldMaturity,
+                    valueOfLowestYieldfCash
+                );
+                lowestYieldFCash.redeemToUnderlying(fCashAmountToWithdraw, address(this), maxImpliedRate);
+                return _asset.balanceOf(address(this));
+            } else {
+                // We need to redeem everything from lowestYieldMaturity and move onto the highest yield maturity
+                lowestYieldFCash.redeemToUnderlying(fCashAmountLowestYieldMaturity, address(this), maxImpliedRate);
+                assetBalance = _asset.balanceOf(address(this));
+                if (assetBalance >= _assets) {
+                    // somehow we have withdrawn enough assets, return the assets
+                    return _assets;
+                } else {
+                    assetsToWithdrawFromMaturities = _assets - assetBalance;
+                }
+            }
+        }
+        FCashProperties memory highestYieldNotionalMarket = sortedfCashPositions[1];
+        IWrappedfCashComplete highestYieldFCash = IWrappedfCashComplete(highestYieldNotionalMarket.wrappedfCash);
+        uint fCashAmountHighestYieldMaturity = highestYieldFCash.balanceOf(address(this));
+        if (fCashAmountHighestYieldMaturity > 0) {
+            uint32 maxImpliedRate = _getMaxImpliedRate(highestYieldNotionalMarket.oracleRate);
+            uint valueOfHighestYieldfCash = highestYieldFCash.convertToAssets(fCashAmountHighestYieldMaturity);
+            if (valueOfHighestYieldfCash >= assetsToWithdrawFromMaturities) {
+                // Amount to withdraw is the percentage of the available highest yield fCash
+                uint fCashAmountToWithdraw = assetsToWithdrawFromMaturities.mulDiv(
+                    fCashAmountHighestYieldMaturity,
+                    valueOfHighestYieldfCash
+                );
+                highestYieldFCash.redeemToUnderlying(fCashAmountToWithdraw, address(this), maxImpliedRate);
+            } else {
+                // Withdraw everything from highest yield maturity
+                lowestYieldFCash.redeemToUnderlying(fCashAmountHighestYieldMaturity, address(this), maxImpliedRate);
+            }
+        }
+        return _asset.balanceOf(address(this));
+    }
+
+    /// @notice Preview withdrawal of assets from maturities
+    /// @param _assets Amount of assets for withdrawal
+    function _previewRedeemFromMaturities(uint _assets) internal view returns (uint) {
+        IERC20MetadataUpgradeable _asset = IERC20MetadataUpgradeable(asset());
+        uint assetBalance = _asset.balanceOf(address(this));
+        // There is enough assets in the vault, there will be no need to withdraw from fCash positions
+        if (assetBalance >= _assets) {
+            return _assets;
+        }
+        // Otherwise the amount of assets to withdraw is the difference between the amount of assets in the vault and the amount of assets to withdraw from maturities
+        uint assetsToWithdrawFromMaturities = _assets - assetBalance;
+        FCashProperties[2] memory sortedfCashPositions = _sortStoredfCashPositions();
+        // First simulate withdrawal from lowest yield maturity
+        FCashProperties memory lowestYieldNotionalMarket = sortedfCashPositions[0];
+        IWrappedfCashComplete lowestYieldFCash = IWrappedfCashComplete(lowestYieldNotionalMarket.wrappedfCash);
+        uint fCashAmountLowestYieldMaturity = lowestYieldFCash.balanceOf(address(this));
+        uint assetsWithdrawnFromLowestYieldMaturity;
+        if (fCashAmountLowestYieldMaturity > 0) {
+            uint valueOfLowestYieldfCash = lowestYieldFCash.convertToAssets(fCashAmountLowestYieldMaturity);
+            if (valueOfLowestYieldfCash >= assetsToWithdrawFromMaturities) {
+                // Amount to withdraw is the percentage of the available lowest yield fCash
+                uint fCashAmountToWithdraw = assetsToWithdrawFromMaturities.mulDiv(
+                    fCashAmountLowestYieldMaturity,
+                    valueOfLowestYieldfCash
+                );
+                return assetBalance + lowestYieldFCash.previewRedeem(fCashAmountToWithdraw);
+            } else {
+                // We need to redeem everything from lowestYieldMaturity and move onto the highest yield maturity
+                assetsWithdrawnFromLowestYieldMaturity = lowestYieldFCash.previewRedeem(fCashAmountLowestYieldMaturity);
+                if (assetsWithdrawnFromLowestYieldMaturity + assetBalance >= _assets) {
+                    // somehow we have withdrawn enough assets, return the assets
+                    return _assets;
+                } else {
+                    assetsToWithdrawFromMaturities = _assets - assetBalance - assetsWithdrawnFromLowestYieldMaturity;
+                }
+            }
+        }
+        FCashProperties memory highestYieldNotionalMarket = sortedfCashPositions[1];
+        IWrappedfCashComplete highestYieldFCash = IWrappedfCashComplete(highestYieldNotionalMarket.wrappedfCash);
+        uint fCashAmountHighestYieldMaturity = highestYieldFCash.balanceOf(address(this));
+        uint assetsWithdrawnFromHighestYieldMaturity;
+        if (fCashAmountHighestYieldMaturity > 0) {
+            uint valueOfHighestYieldfCash = highestYieldFCash.convertToAssets(fCashAmountHighestYieldMaturity);
+            if (valueOfHighestYieldfCash >= assetsToWithdrawFromMaturities) {
+                // Amount to withdraw is the percentage of the available highest yield fCash
+                uint fCashAmountToWithdraw = assetsToWithdrawFromMaturities.mulDiv(
+                    fCashAmountHighestYieldMaturity,
+                    valueOfHighestYieldfCash
+                );
+                assetsWithdrawnFromHighestYieldMaturity = highestYieldFCash.previewRedeem(fCashAmountToWithdraw);
+            } else {
+                // Withdraw everything from highest yield maturity
+                assetsWithdrawnFromHighestYieldMaturity = highestYieldFCash.previewRedeem(
+                    fCashAmountHighestYieldMaturity
+                );
+            }
+        }
+        return
+            _asset.balanceOf(address(this)) +
+            assetsWithdrawnFromLowestYieldMaturity +
+            assetsWithdrawnFromHighestYieldMaturity;
+    }
+
+    /// @notice Sorts stored fCash positions in order: matured, lowestYield, highestYield
+    function _sortStoredfCashPositions() internal view returns (FCashProperties[2] memory sorted) {
+        address _firstfCashPosition = fCashPositions[0];
+        address _secondfCashPosition = fCashPositions[1];
+        // If one of the fCash positions has matured in between harvesting/withdrawal it means that the other one has rolled and became a 3 month maturity.
+        // We can set max value for oracleRate for the matured fCash since it doesn't matter during redemption.
+        // first position is matured redeem from it first.
+        if (IWrappedfCashComplete(_firstfCashPosition).hasMatured()) {
+            sorted[0] = FCashProperties({ wrappedfCash: _firstfCashPosition, oracleRate: type(uint32).max });
+            MarketParameters memory threeMonthfCash = _getNotionalMarketParameters(_secondfCashPosition);
+            sorted[1] = FCashProperties({
+                wrappedfCash: _secondfCashPosition,
+                oracleRate: uint32(threeMonthfCash.oracleRate)
+            });
+            // second position is matured redeem from it first
+        } else if (IWrappedfCashComplete(_secondfCashPosition).hasMatured()) {
+            sorted[0] = FCashProperties({ wrappedfCash: _secondfCashPosition, oracleRate: type(uint32).max });
+            MarketParameters memory threeMonthfCash = _getNotionalMarketParameters(_firstfCashPosition);
+            sorted[1] = FCashProperties({
+                wrappedfCash: _firstfCashPosition,
+                oracleRate: uint32(threeMonthfCash.oracleRate)
+            });
+            // both positions are still active, we need to fetch the oracle rates and compare it again
+        } else {
+            (
+                NotionalMarket memory lowestYieldMarket,
+                NotionalMarket memory highestYieldMarket
+            ) = sortMarketsByOracleRate();
+            uint16 _currencyId = currencyId;
+            IWrappedfCashFactory _wrappedfCashFactory = wrappedfCashFactory;
+            address lowestYieldfCash = _wrappedfCashFactory.computeAddress(
+                _currencyId,
+                uint40(lowestYieldMarket.maturity)
+            );
+            address highestYieldfCash = _wrappedfCashFactory.computeAddress(
+                _currencyId,
+                uint40(highestYieldMarket.maturity)
+            );
+            sorted[0] = FCashProperties({
+                wrappedfCash: lowestYieldfCash,
+                oracleRate: uint32(lowestYieldMarket.oracleRate)
+            });
+            sorted[1] = FCashProperties({
+                wrappedfCash: highestYieldfCash,
+                oracleRate: uint32(highestYieldMarket.oracleRate)
+            });
+        }
+        return sorted;
     }
 
     /// @notice Fetches market parameters from Notional
@@ -549,6 +605,15 @@ contract SavingsVault is
         }
         require(marketCount == SUPPORTED_MATURITIES, "SavingsVault: NOTIONAL_MARKETS");
         return markets;
+    }
+
+    /// @notice Calculates maxImpliedRate based on the oracleRate and maxLoss specified
+    function _getMaxImpliedRate(uint32 _oracleRate) internal view returns (uint32) {
+        if (_oracleRate == type(uint32).max) {
+            return type(uint32).max;
+        }
+        uint numerator = 2 * BP - maxLoss;
+        return uint32((_oracleRate * numerator) / BP);
     }
 
     /// @inheritdoc UUPSUpgradeable

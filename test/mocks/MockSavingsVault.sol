@@ -33,6 +33,10 @@ contract MockSavingsVault is SavingsVault {
         return _getThreeAndSixMonthMarkets();
     }
 
+    function __getMaxImpliedRate(uint32 _oracleRate) public view returns (uint32) {
+        return _getMaxImpliedRate(_oracleRate);
+    }
+
     function getAUMFee(uint _lastTransfer) public view returns (uint) {
         uint timePassed = _lastTransfer - lastTransferTime;
         if (timePassed != 0) {

@@ -3,6 +3,8 @@ import { BigNumber } from 'ethers'
 import {
   ERC20Upgradeable__factory,
   IWrappedfCashComplete__factory,
+  JobConfig__factory,
+  PhutureJob__factory,
   SavingsVaultViews__factory,
   SavingsVault__factory
 } from '../../typechain-types'
@@ -20,14 +22,18 @@ function timestampToFormattedTime(timestamp: BigNumber): string {
 
 async function main() {
   const signer = parseWallet('PRIVATE_KEY')
-  const { savingsVaultAddress, savingsVaultViewsAddress } = logger.logInputs({
+  const { savingsVaultAddress, savingsVaultViewsAddress, jobConfigAddress, phutureJobAddress } = logger.logInputs({
     signer: signer.address,
     savingsVaultAddress: parseEthAddress('SAVINGS_VAULT'),
-    savingsVaultViewsAddress: parseEthAddress('SAVINGS_VAULT_VIEWS')
+    savingsVaultViewsAddress: parseEthAddress('SAVINGS_VAULT_VIEWS'),
+    jobConfigAddress: parseEthAddress('JOB_CONFIG'),
+    phutureJobAddress: parseEthAddress('PHUTURE_JOB')
   })
 
   const savingsVault = SavingsVault__factory.connect(savingsVaultAddress, signer)
   const savingsVaultViews = SavingsVaultViews__factory.connect(savingsVaultViewsAddress, signer)
+  const jobConfig = JobConfig__factory.connect(jobConfigAddress, signer)
+  const phutureJob = PhutureJob__factory.connect(phutureJobAddress, signer)
   const usdc = ERC20Upgradeable__factory.connect(await savingsVault.asset(), signer)
 
   const totalAssetsOraclized = await savingsVault.totalAssets()
@@ -83,9 +89,13 @@ async function main() {
     USDC: { usdcEquivalent: bnToFormattedString(await usdc.balanceOf(savingsVaultAddress), 6) }
   })
 
-  logger.info(
-    'Current APY of the vault is: ' + bnToFormattedString(await savingsVaultViews.getAPY(savingsVault.address), 7) + '%'
-  )
+  console.log('Savings Vault Views data: ')
+  console.table({
+    'Max deposited amount': bnToFormattedString(await savingsVaultViews.getMaxDepositedAmount(savingsVault.address), 6),
+    'Max loss': bnToFormattedString(BigNumber.from(await savingsVault.maxLoss()), 2) + '%',
+    'Scaled Amount': bnToFormattedString(await jobConfig.getDepositedAmount(savingsVault.address), 6),
+    APY: bnToFormattedString(await savingsVaultViews.getAPY(savingsVault.address), 7) + '%'
+  })
 }
 
 main()
