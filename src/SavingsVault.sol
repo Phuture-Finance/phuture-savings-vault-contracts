@@ -153,7 +153,7 @@ contract SavingsVault is
         IERC20Upgradeable(_asset).safeApprove(highestYieldfCash, deposited);
         IWrappedfCashComplete(highestYieldfCash).mintViaUnderlying(
             deposited,
-            _safeUint88(fCashAmount),
+            uint88(fCashAmount),
             address(this),
             uint32((highestYieldMarket.oracleRate * maxLoss) / BP)
         );
@@ -618,13 +618,6 @@ contract SavingsVault is
 
     /// @inheritdoc UUPSUpgradeable
     function _authorizeUpgrade(address _newImpl) internal view virtual override onlyRole(VAULT_MANAGER_ROLE) {}
-
-    /// @notice Safe downcast from uint256 to uint88
-    /// @param _x value to downcast
-    function _safeUint88(uint256 _x) internal pure returns (uint88) {
-        require(_x <= uint256(type(uint88).max), "SavingsVault: OVERFLOW");
-        return uint88(_x);
-    }
 
     uint256[45] private __gap;
 }
