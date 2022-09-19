@@ -24,6 +24,9 @@ contract PhutureJob is IPhutureJob, IKeeper3r, IHarvestingJob, Pausable, Ownable
     /// @inheritdoc IHarvestingJob
     mapping(address => uint96) public lastHarvest;
 
+    /// @inheritdoc IHarvestingJob
+    mapping(address => uint32) public timeout;
+
     /// @notice Pays keeper for work
     modifier payKeeper(address _keeper) {
         require(IKeep3r(keep3r).isKeeper(_keeper), "PhutureJob: !KEEP3R");
@@ -53,8 +56,13 @@ contract PhutureJob is IPhutureJob, IKeeper3r, IHarvestingJob, Pausable, Ownable
     }
 
     /// @inheritdoc IHarvestingJob
+    function setTimeout(uint32 _timeout, address _savingsVault) external onlyOwner {
+        timeout[_savingsVault] = _timeout;
+    }
+
+    /// @inheritdoc IHarvestingJob
     function harvest(ISavingsVaultHarvester _vault) external override whenNotPaused payKeeper(msg.sender) {
-        require(canHarvest(_vault), "PhutureJob:TIMEOUT");
+        require(canHarvest(address(_vault)), "PhutureJob:TIMEOUT");
         uint depositedAmount = IJobConfig(jobConfig).getDepositedAmount(address(_vault));
         require(depositedAmount != 0, "PhutureJob:NOTHING_TO_DEPOSIT");
         _vault.harvest(depositedAmount);
@@ -62,7 +70,7 @@ contract PhutureJob is IPhutureJob, IKeeper3r, IHarvestingJob, Pausable, Ownable
     }
 
     /// @inheritdoc IHarvestingJob
-    function canHarvest(ISavingsVaultHarvester _vault) public view returns (bool) {
-        return block.timestamp - lastHarvest[address(_vault)] >= _vault.timeout();
+    function canHarvest(address _vault) public view returns (bool) {
+        return block.timestamp - lastHarvest[_vault] >= timeout[_vault];
     }
 }

@@ -33,7 +33,6 @@ interface ISavingsVault {
     /// @param _notionalRouter Address of the deployed notional router
     /// @param _maxLoss Maximum loss allowed
     /// @param _feeRecipient Address of the feeRecipient
-    /// @param _timeout Timeout between two harvests
     function initialize(
         string memory _name,
         string memory _symbol,
@@ -42,8 +41,7 @@ interface ISavingsVault {
         IWrappedfCashFactory _wrappedfCashFactory,
         address _notionalRouter,
         uint16 _maxLoss,
-        address _feeRecipient,
-        uint32 _timeout
+        address _feeRecipient
     ) external;
 
     /// @notice Sets maxLoss
@@ -70,5 +68,18 @@ interface ISavingsVault {
         uint8 _v,
         bytes32 _r,
         bytes32 _s
-    ) external returns (uint256);
+    ) external returns (uint);
+
+    /// @notice Redeems savings vault shares in exchange for assets
+    /// @param _shares Amount shares to burn
+    /// @param _receiver Address which receives the assets
+    /// @param _owner Address which owns the shares
+    /// @param _maxLoss Maximum loss allowed during withdrawal
+    /// @return Amount of assets received for the given shares
+    function redeemWithMaxLoss(
+        uint256 _shares,
+        address _receiver,
+        address _owner,
+        uint16 _maxLoss
+    ) external returns (uint);
 }

@@ -11,18 +11,22 @@ import "./external/notional/interfaces/INotionalV2.sol";
 /// @title JobConfig functions
 /// @notice Contains function for configuring phuture jobs
 contract JobConfig is IJobConfig, Ownable {
-    /// @notice Harvesting amount specification
-    HarvestingSpecification internal harvestingSpecification;
     /// @inheritdoc IJobConfig
-    address public savingsVaultViews;
+    uint public constant SCALING_STEPS = 3;
+    /// @inheritdoc IJobConfig
+    uint public constant SCALING_PERCENTAGE = 30;
+    /// @inheritdoc IJobConfig
+    HarvestingSpecification public harvestingSpecification;
+    /// @inheritdoc IJobConfig
+    ISavingsVaultViews public savingsVaultViews;
 
-    constructor(address _savingsVaultViews) {
+    constructor(ISavingsVaultViews _savingsVaultViews) {
         savingsVaultViews = _savingsVaultViews;
         harvestingSpecification = HarvestingSpecification.SCALED_AMOUNT;
     }
 
     /// @inheritdoc IJobConfig
-    function setSavingsVaultViews(address _savingsVaultViews) external onlyOwner {
+    function setSavingsVaultViews(ISavingsVaultViews _savingsVaultViews) external onlyOwner {
         savingsVaultViews = _savingsVaultViews;
     }
 
@@ -36,24 +40,14 @@ contract JobConfig is IJobConfig, Ownable {
         if (harvestingSpecification == HarvestingSpecification.MAX_AMOUNT) {
             return type(uint).max;
         } else if (harvestingSpecification == HarvestingSpecification.MAX_DEPOSITED_AMOUNT) {
-            return ISavingsVaultViews(savingsVaultViews).getMaxDepositedAmount(_savingsVault);
+            return savingsVaultViews.getMaxDepositedAmount(_savingsVault);
         } else if (harvestingSpecification == HarvestingSpecification.SCALED_AMOUNT) {
-            uint amount = ISavingsVaultViews(savingsVaultViews).getMaxDepositedAmount(_savingsVault);
+            uint amount = savingsVaultViews.getMaxDepositedAmount(_savingsVault);
             if (amount == 0) {
                 return amount;
             }
-            return ISavingsVaultViews(savingsVaultViews).scaleAmount(_savingsVault, amount, 30, 3);
-        } else {
-            return 0;
+            return savingsVaultViews.scaleAmount(_savingsVault, amount, SCALING_PERCENTAGE, SCALING_STEPS);
         }
-    }
-
-    /// @inheritdoc IJobConfig
-    function getHarvestingSpecification(uint _index) external pure returns (HarvestingSpecification) {
-        if (_index == 1) return HarvestingSpecification.MAX_AMOUNT;
-        if (_index == 2) return HarvestingSpecification.MAX_DEPOSITED_AMOUNT;
-        if (_index == 3) return HarvestingSpecification.SCALED_AMOUNT;
-
-        revert("JOB_CONFIG: INVALID");
+        return 0;
     }
 }

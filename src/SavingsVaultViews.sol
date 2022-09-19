@@ -15,6 +15,8 @@ import "./interfaces/ISavingsVaultHarvester.sol";
 import "./interfaces/ISavingsVault.sol";
 import "./interfaces/ISavingsVaultViews.sol";
 
+import "./libraries/TypeConversionLibrary.sol";
+
 /// @title Savings vault helper view functions
 /// @notice Contains helper view functions
 contract SavingsVaultViews is ISavingsVaultViews {
@@ -22,10 +24,9 @@ contract SavingsVaultViews is ISavingsVaultViews {
     function getAPY(ISavingsVaultViewer _savingsVault) external view returns (uint) {
         uint16 currencyId = _savingsVault.currencyId();
         address[2] memory fCashPositions = _savingsVault.getfCashPositions();
-        uint8 supportedMaturities = _savingsVault.SUPPORTED_MATURITIES();
         uint numerator;
         uint denominator;
-        for (uint i = 0; i < supportedMaturities; i++) {
+        for (uint i = 0; i < 2; i++) {
             IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions[i]);
             uint fCashBalance = fCashPosition.balanceOf(address(_savingsVault));
             if (!fCashPosition.hasMatured() && fCashBalance != 0) {
@@ -41,11 +42,7 @@ contract SavingsVaultViews is ISavingsVaultViews {
                 denominator += assets;
             }
         }
-        if (denominator != 0) {
-            return numerator / denominator;
-        } else {
-            return 0;
-        }
+        return denominator != 0 ? numerator / denominator : 0;
     }
 
     /// @inheritdoc ISavingsVaultViews
@@ -70,7 +67,7 @@ contract SavingsVaultViews is ISavingsVaultViews {
             true
         );
         uint scalingAmount = (fCashAmount * _percentage) / 100;
-        for (uint i = 0; i < _steps + 1; i++) {
+        for (uint i = 0; i <= _steps; ) {
             try
                 calculationViews.getDepositFromfCashLend(
                     currencyId,
@@ -83,11 +80,13 @@ contract SavingsVaultViews is ISavingsVaultViews {
                 return amountUnderlying;
             } catch {
                 // If we can scale it further we continue, else we exit the for loop.
-                if (fCashAmount >= scalingAmount) {
-                    fCashAmount = fCashAmount - scalingAmount;
-                } else {
+                if (fCashAmount < scalingAmount) {
                     break;
                 }
+                fCashAmount -= scalingAmount;
+            }
+            unchecked {
+                i = i + 1;
             }
         }
         return 0;
@@ -97,8 +96,7 @@ contract SavingsVaultViews is ISavingsVaultViews {
     function getMaxDepositedAmount(address _savingsVault) public view returns (uint maxDepositedAmount) {
         maxDepositedAmount += IERC4626Upgradeable(IERC4626Upgradeable(_savingsVault).asset()).balanceOf(_savingsVault);
         address[2] memory fCashPositions = ISavingsVaultViewer(_savingsVault).getfCashPositions();
-        uint8 supportedMaturities = ISavingsVaultViewer(_savingsVault).SUPPORTED_MATURITIES();
-        for (uint i = 0; i < supportedMaturities; i++) {
+        for (uint i = 0; i < 2; i++) {
             IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions[i]);
             if (fCashPosition.hasMatured()) {
                 uint fCashAmount = fCashPosition.balanceOf(address(this));
@@ -123,7 +121,7 @@ contract SavingsVaultViews is ISavingsVaultViews {
         (, ISavingsVault.NotionalMarket memory highestYieldMarket) = ISavingsVaultHarvester(_savingsVault)
             .sortMarketsByOracleRate();
         maturity = highestYieldMarket.maturity;
-        minImpliedRate = uint32(
+        minImpliedRate = TypeConversionLibrary._safeUint32(
             (highestYieldMarket.oracleRate * ISavingsVaultViewer(_savingsVault).maxLoss()) /
                 ISavingsVaultViewer(_savingsVault).BP()
         );

@@ -11,7 +11,6 @@ import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/IERC
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/IERC20Upgradeable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/utils/math/MathUpgradeable.sol";
-import "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 import { NotionalViews, MarketParameters } from "./external/notional/interfaces/INotional.sol";
 import "./external/notional/lib/DateTime.sol";
@@ -20,6 +19,7 @@ import { IWrappedfCashComplete } from "./external/notional/interfaces/IWrappedfC
 import "./external/notional/lib/Constants.sol";
 import "./interfaces/ISavingsVault.sol";
 import "./libraries/AUMCalculationLibrary.sol";
+import "./libraries/TypeConversionLibrary.sol";
 import "./interfaces/ISavingsVaultHarvester.sol";
 import "./interfaces/ISavingsVaultViewer.sol";
 
@@ -54,11 +54,9 @@ contract SavingsVault is
     /// @inheritdoc ISavingsVaultViewer
     uint public constant BURNING_FEE_IN_BP = 50;
 
-    /// @inheritdoc ISavingsVaultHarvester
-    uint32 public timeout;
     /// @inheritdoc ISavingsVaultViewer
     uint16 public currencyId;
-    /// @notice ISavingsVaultViewer
+    /// @inheritdoc ISavingsVaultViewer
     uint16 public maxLoss;
     /// @inheritdoc ISavingsVaultViewer
     address public notionalRouter;
@@ -73,7 +71,7 @@ contract SavingsVault is
 
     /// @notice Checks if max loss is within an acceptable range
     modifier isValidMaxLoss(uint16 _maxLoss) {
-        require(_maxLoss <= BP, "SavingsVault: MAX_LOSS");
+        require(_maxLoss <= BP, "Max_loss");
         _;
     }
 
@@ -91,8 +89,7 @@ contract SavingsVault is
         IWrappedfCashFactory _wrappedfCashFactory,
         address _notionalRouter,
         uint16 _maxLoss,
-        address _feeRecipient,
-        uint32 _timeout
+        address _feeRecipient
     ) external initializer isValidMaxLoss(_maxLoss) {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(VAULT_ADMIN_ROLE, msg.sender);
@@ -111,7 +108,6 @@ contract SavingsVault is
         maxLoss = _maxLoss;
         feeRecipient = _feeRecipient;
         lastTransferTime = uint96(block.timestamp);
-        timeout = _timeout;
 
         (NotionalMarket memory lowestYieldMarket, NotionalMarket memory highestYieldMarket) = sortMarketsByOracleRate();
 
@@ -134,7 +130,7 @@ contract SavingsVault is
         if (assetBalance == 0 || _maxDepositedAmount == 0) {
             return;
         }
-        uint deposited = Math.min(assetBalance, _maxDepositedAmount);
+        uint deposited = assetBalance < _maxDepositedAmount ? assetBalance : _maxDepositedAmount;
 
         (NotionalMarket memory lowestYieldMarket, NotionalMarket memory highestYieldMarket) = sortMarketsByOracleRate();
 
@@ -153,9 +149,9 @@ contract SavingsVault is
         IERC20Upgradeable(_asset).safeApprove(highestYieldfCash, deposited);
         IWrappedfCashComplete(highestYieldfCash).mintViaUnderlying(
             deposited,
-            uint88(fCashAmount),
+            TypeConversionLibrary._safeUint88(fCashAmount),
             address(this),
-            uint32((highestYieldMarket.oracleRate * maxLoss) / BP)
+            TypeConversionLibrary._safeUint32((highestYieldMarket.oracleRate * maxLoss) / BP)
         );
         IERC20Upgradeable(_asset).safeApprove(highestYieldfCash, 0);
         emit FCashMinted(IWrappedfCashComplete(highestYieldfCash), deposited, fCashAmount);
@@ -164,11 +160,6 @@ contract SavingsVault is
     /// @inheritdoc ISavingsVault
     function setMaxLoss(uint16 _maxLoss) external onlyRole(VAULT_MANAGER_ROLE) isValidMaxLoss(_maxLoss) {
         maxLoss = _maxLoss;
-    }
-
-    /// @inheritdoc ISavingsVaultHarvester
-    function setTimeout(uint32 _timeout) external onlyRole(VAULT_MANAGER_ROLE) {
-        timeout = _timeout;
     }
 
     /// @inheritdoc ISavingsVault
@@ -187,7 +178,7 @@ contract SavingsVault is
         address _receiver,
         address _owner
     ) public override returns (uint256) {
-        require(_assets <= maxWithdraw(_owner), "SavingsVault: withdraw more than max");
+        require(_assets <= maxWithdraw(_owner), "Withdraw_max");
         // determine the amount of shares for the assets without the fees
         uint shares = _convertToShares(_assets, MathUpgradeable.Rounding.Up);
         // determine the burning fee on top of the estimated shares for withdrawing the exact asset output
@@ -201,7 +192,7 @@ contract SavingsVault is
             _chargeAUMFee();
         }
         // shares accounting for the fees are not burned since they are transferred to the feeRecipient
-        uint assetsWithdrawn = _beforeWithdraw(_assets);
+        uint assetsWithdrawn = _beforeWithdraw(_assets, 0);
         _withdraw(msg.sender, _receiver, _owner, assetsWithdrawn, shares);
         // returns the shares plus fee
         return shares + fee;
@@ -213,13 +204,23 @@ contract SavingsVault is
         address _receiver,
         address _owner
     ) public override returns (uint256) {
-        require(_shares <= maxRedeem(_owner), "SavingsVault: redeem more than max");
+        return redeemWithMaxLoss(_shares, _receiver, _owner, 0);
+    }
+
+    /// @inheritdoc ISavingsVault
+    function redeemWithMaxLoss(
+        uint256 _shares,
+        address _receiver,
+        address _owner,
+        uint16 _maxLoss
+    ) public returns (uint256) {
+        require(_shares <= maxRedeem(_owner), "Redeem_max");
         // input shares equal to _shares = sharesToBurn + sharesToBurn * burning_fee.
         // By solving the equation for sharesToBurn we can calculate the fee by subtracting sharesToBurn from the input _shares
         uint sharesToBurn = (_shares * BP) / (BP + BURNING_FEE_IN_BP);
         uint fee = _shares - sharesToBurn;
         // converts sharesToBurn to assets which are transferred to the user
-        uint256 assets = convertToAssets(sharesToBurn);
+        uint assets = convertToAssets(sharesToBurn);
         if (fee != 0) {
             // AUM charged inside _transfer
             // Transfer the shares which account for the fee to the feeRecipient
@@ -227,7 +228,7 @@ contract SavingsVault is
         } else {
             _chargeAUMFee();
         }
-        uint assetsWithdrawn = _beforeWithdraw(assets);
+        uint assetsWithdrawn = _beforeWithdraw(assets, _maxLoss);
         _withdraw(msg.sender, _receiver, _owner, assetsWithdrawn, sharesToBurn);
 
         return assetsWithdrawn;
@@ -235,7 +236,7 @@ contract SavingsVault is
 
     /// @inheritdoc ERC4626Upgradeable
     function mint(uint256 _shares, address receiver) public override returns (uint256) {
-        require(_shares <= maxMint(receiver), "SavingsVault: mint more than max");
+        require(_shares <= maxMint(receiver), "Mint_max");
 
         uint256 assets = _convertToAssets(_shares, MathUpgradeable.Rounding.Up);
 
@@ -253,7 +254,7 @@ contract SavingsVault is
 
     /// @inheritdoc ERC4626Upgradeable
     function deposit(uint256 _assets, address _receiver) public override returns (uint256) {
-        require(_assets <= maxDeposit(_receiver), "SavingsVault: deposit more than max");
+        require(_assets <= maxDeposit(_receiver), "Deposit_max");
         // calculate the shares to mint
         uint shares = convertToShares(_assets);
         uint fee = (shares * MINTING_FEE_IN_BP) / (BP + MINTING_FEE_IN_BP);
@@ -268,13 +269,13 @@ contract SavingsVault is
 
     /// @inheritdoc ISavingsVault
     function depositWithPermit(
-        uint256 _assets,
+        uint _assets,
         address _receiver,
         uint _deadline,
         uint8 _v,
         bytes32 _r,
         bytes32 _s
-    ) public override returns (uint256) {
+    ) public override returns (uint) {
         address _asset = asset();
         ERC20PermitUpgradeable(_asset).permit(msg.sender, address(this), _assets, _deadline, _v, _r, _s);
         return deposit(_assets, _receiver);
@@ -401,7 +402,7 @@ contract SavingsVault is
 
     /// @notice Withdraws asset from maturities
     /// @param _assets Amount of assets for withdrawal
-    function _beforeWithdraw(uint _assets) internal returns (uint) {
+    function _beforeWithdraw(uint _assets, uint16 _maxLoss) internal returns (uint) {
         IERC20MetadataUpgradeable _asset = IERC20MetadataUpgradeable(asset());
         uint assetBalance = _asset.balanceOf(address(this));
         // There is enough assets in the vault, no need to withdraw from fCash positions
@@ -416,7 +417,7 @@ contract SavingsVault is
         IWrappedfCashComplete lowestYieldFCash = IWrappedfCashComplete(lowestYieldNotionalMarket.wrappedfCash);
         uint fCashAmountLowestYieldMaturity = lowestYieldFCash.balanceOf(address(this));
         if (fCashAmountLowestYieldMaturity > 0) {
-            uint32 maxImpliedRate = _getMaxImpliedRate(lowestYieldNotionalMarket.oracleRate);
+            uint32 maxImpliedRate = _getMaxImpliedRate(lowestYieldNotionalMarket.oracleRate, _maxLoss);
             uint valueOfLowestYieldfCash = lowestYieldFCash.convertToAssets(fCashAmountLowestYieldMaturity);
             if (valueOfLowestYieldfCash >= assetsToWithdrawFromMaturities) {
                 // Amount to withdraw is the percentage of the available lowest yield fCash
@@ -442,7 +443,7 @@ contract SavingsVault is
         IWrappedfCashComplete highestYieldFCash = IWrappedfCashComplete(highestYieldNotionalMarket.wrappedfCash);
         uint fCashAmountHighestYieldMaturity = highestYieldFCash.balanceOf(address(this));
         if (fCashAmountHighestYieldMaturity > 0) {
-            uint32 maxImpliedRate = _getMaxImpliedRate(highestYieldNotionalMarket.oracleRate);
+            uint32 maxImpliedRate = _getMaxImpliedRate(highestYieldNotionalMarket.oracleRate, _maxLoss);
             uint valueOfHighestYieldfCash = highestYieldFCash.convertToAssets(fCashAmountHighestYieldMaturity);
             if (valueOfHighestYieldfCash >= assetsToWithdrawFromMaturities) {
                 // Amount to withdraw is the percentage of the available highest yield fCash
@@ -534,7 +535,7 @@ contract SavingsVault is
             MarketParameters memory threeMonthfCash = _getNotionalMarketParameters(_secondfCashPosition);
             sorted[1] = FCashProperties({
                 wrappedfCash: _secondfCashPosition,
-                oracleRate: uint32(threeMonthfCash.oracleRate)
+                oracleRate: TypeConversionLibrary._safeUint32(threeMonthfCash.oracleRate)
             });
             // second position is matured redeem from it first
         } else if (IWrappedfCashComplete(_secondfCashPosition).hasMatured()) {
@@ -542,7 +543,7 @@ contract SavingsVault is
             MarketParameters memory threeMonthfCash = _getNotionalMarketParameters(_firstfCashPosition);
             sorted[1] = FCashProperties({
                 wrappedfCash: _firstfCashPosition,
-                oracleRate: uint32(threeMonthfCash.oracleRate)
+                oracleRate: TypeConversionLibrary._safeUint32(threeMonthfCash.oracleRate)
             });
             // both positions are still active, we need to fetch the oracle rates and compare it again
         } else {
@@ -562,11 +563,11 @@ contract SavingsVault is
             );
             sorted[0] = FCashProperties({
                 wrappedfCash: lowestYieldfCash,
-                oracleRate: uint32(lowestYieldMarket.oracleRate)
+                oracleRate: TypeConversionLibrary._safeUint32(lowestYieldMarket.oracleRate)
             });
             sorted[1] = FCashProperties({
                 wrappedfCash: highestYieldfCash,
-                oracleRate: uint32(highestYieldMarket.oracleRate)
+                oracleRate: TypeConversionLibrary._safeUint32(highestYieldMarket.oracleRate)
             });
         }
         return sorted;
@@ -603,21 +604,21 @@ contract SavingsVault is
             );
             marketCount++;
         }
-        require(marketCount == SUPPORTED_MATURITIES, "SavingsVault: NOTIONAL_MARKETS");
+        require(marketCount == SUPPORTED_MATURITIES, "Notional_markets");
         return markets;
-    }
-
-    /// @notice Calculates maxImpliedRate based on the oracleRate and maxLoss specified
-    function _getMaxImpliedRate(uint32 _oracleRate) internal view returns (uint32) {
-        if (_oracleRate == type(uint32).max) {
-            return type(uint32).max;
-        }
-        uint numerator = 2 * BP - maxLoss;
-        return uint32((_oracleRate * numerator) / BP);
     }
 
     /// @inheritdoc UUPSUpgradeable
     function _authorizeUpgrade(address _newImpl) internal view virtual override onlyRole(VAULT_MANAGER_ROLE) {}
+
+    /// @notice Calculates maxImpliedRate based on the oracleRate and maxLoss specified
+    function _getMaxImpliedRate(uint32 _oracleRate, uint16 _maxLoss) internal pure returns (uint32) {
+        if (_oracleRate == type(uint32).max || _maxLoss == 0) {
+            return type(uint32).max;
+        }
+        uint numerator = 2 * BP - _maxLoss;
+        return TypeConversionLibrary._safeUint32((_oracleRate * numerator) / BP);
+    }
 
     uint256[45] private __gap;
 }

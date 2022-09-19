@@ -61,8 +61,7 @@ contract SavingsVaultViewsTest is Test {
                         wrappedfCashFactory,
                         notionalRouter,
                         0,
-                        feeRecipient,
-                        1 days
+                        feeRecipient
                     )
                 )
             )
@@ -87,7 +86,7 @@ contract SavingsVaultViewsTest is Test {
 
         // apy after investing into first maturity
         assertEq(views.getAPY(SavingsVaultProxy), 42173528);
-        vm.warp(block.timestamp + SavingsVaultProxy.timeout() + 1);
+        vm.warp(block.timestamp + 1 days + 1);
 
         SavingsVaultProxy.deposit(500 * 1e6, usdcWhale);
         ISavingsVault.NotionalMarket[] memory markets = SavingsVaultProxy.__getThreeAndSixMonthMarkets();

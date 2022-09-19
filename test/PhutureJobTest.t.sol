@@ -69,7 +69,7 @@ contract PhutureJobTest is Test {
             )
         );
         views = new SavingsVaultViews();
-        jobConfig = new JobConfig(address(views));
+        jobConfig = new JobConfig(views);
         keep3r = new Keepr3rMock();
         phutureJob = new PhutureJob(address(keep3r), address(jobConfig));
         phutureJob.unpause();
@@ -86,6 +86,7 @@ contract PhutureJobTest is Test {
     }
 
     function testCannotHarvest() public {
+        phutureJob.setTimeout(5, address(savingsVaultProxy));
         vm.startPrank(usdcWhale);
         usdc.approve(address(savingsVaultProxy), type(uint).max);
         savingsVaultProxy.deposit(10_000 * 1e6, usdcWhale);
@@ -99,8 +100,9 @@ contract PhutureJobTest is Test {
     }
 
     function testScaledAmount() public {
+        phutureJob.setTimeout(0, address(savingsVaultProxy));
+
         vm.startPrank(usdcWhale);
-        savingsVaultProxy.setTimeout(0);
         usdc.approve(address(savingsVaultProxy), type(uint).max);
 
         // harvesting on zero reserves
@@ -135,5 +137,16 @@ contract PhutureJobTest is Test {
         phutureJob.harvest(savingsVaultProxy);
         assertEq(phutureJob.lastHarvest(address(savingsVaultProxy)), block.timestamp);
         assertEq(usdc.balanceOf(address(savingsVaultProxy)), 600080593772);
+    }
+
+    function testSetHarvestingSpecification() public {
+        jobConfig.setHarvestingAmountSpecification(IJobConfig.HarvestingSpecification.MAX_AMOUNT);
+        IJobConfig.HarvestingSpecification spec = jobConfig.harvestingSpecification();
+        assertEq(uint(spec), uint(IJobConfig.HarvestingSpecification.MAX_AMOUNT));
+    }
+
+    function testSetTimeout() public {
+        phutureJob.setTimeout(5, address(savingsVaultProxy));
+        assertEq(phutureJob.timeout(address(savingsVaultProxy)), 5);
     }
 }

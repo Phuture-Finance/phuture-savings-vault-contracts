@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.13;
 
+import "./ISavingsVaultViews.sol";
+
 /// @title JobConfig interface
 /// @notice Describes function for configuring phuture jobs
 interface IJobConfig {
@@ -11,18 +13,25 @@ interface IJobConfig {
         SCALED_AMOUNT
     }
 
+    /// @notice Number of steps for scaling
+    /// @return Returns number of steps for scaling
+    function SCALING_STEPS() external view returns (uint);
+
+    /// @notice Percentage scaled each step
+    /// @return Returns percentage scaled each step
+    function SCALING_PERCENTAGE() external view returns (uint);
+
     /// @notice Sets harvesting amount specification
     /// @param _harvestingSpecification Enum which specifies the harvesting amount calculation method
     function setHarvestingAmountSpecification(HarvestingSpecification _harvestingSpecification) external;
 
     /// @notice Gets harvesting amount specification
-    /// @param _index Index of the harvesting specification
     /// @return returns harvesting specification
-    function getHarvestingSpecification(uint _index) external returns (HarvestingSpecification);
+    function harvestingSpecification() external returns (HarvestingSpecification);
 
     /// @notice Sets SavingsVaultViews contract
     /// @param _savingsVaultViews Address of the SavingsVaultViews
-    function setSavingsVaultViews(address _savingsVaultViews) external;
+    function setSavingsVaultViews(ISavingsVaultViews _savingsVaultViews) external;
 
     /// @notice Calculates the deposited amount based on the specification
     /// @param _savingsVault Address of the SavingsVault
@@ -31,5 +40,5 @@ interface IJobConfig {
 
     /// @notice Address of the SavingsVaultViews contract
     /// @return Returns address of the SavingsVaultViews contract
-    function savingsVaultViews() external view returns (address);
+    function savingsVaultViews() external view returns (ISavingsVaultViews);
 }

@@ -112,7 +112,7 @@ contract SavingsVaultTest is Test {
     }
 
     function testCannotInitializeWithInvalidMaxLoss() public {
-        vm.expectRevert(bytes("SavingsVault: MAX_LOSS"));
+        vm.expectRevert(bytes("Max_loss"));
         new ERC1967Proxy(
             address(SavingsVaultImpl),
             abi.encodeWithSelector(
@@ -139,8 +139,7 @@ contract SavingsVaultTest is Test {
             IWrappedfCashFactory(wrappedfCashFactory),
             notionalRouter,
             9800,
-            feeRecipient,
-            1 days
+            feeRecipient
         );
     }
 
@@ -154,7 +153,7 @@ contract SavingsVaultTest is Test {
     function testCannotSetMaxLoss() public {
         uint16 invalidMaxLoss = 10_002;
         vm.prank(setupMsgSender);
-        vm.expectRevert(bytes("SavingsVault: MAX_LOSS"));
+        vm.expectRevert(bytes("Max_loss"));
         SavingsVaultProxy.setMaxLoss(invalidMaxLoss);
 
         vm.expectRevert(
@@ -200,7 +199,7 @@ contract SavingsVaultTest is Test {
         vm.expectEmit(true, false, false, true);
         emit FCashMinted(highestYieldFCash, maxDepositedAmount, fCashAmount);
         SavingsVaultProxy.harvest(maxDepositedAmount);
-        vm.warp(block.timestamp + SavingsVaultProxy.timeout() + 1);
+        vm.warp(block.timestamp + 1 days + 1);
 
         assertEq(SavingsVaultProxy.totalAssets(), 999561212039);
         //         fCash amount in the vault is according to wrappedfCash estimation
@@ -371,7 +370,7 @@ contract SavingsVaultTest is Test {
         vm.warp(blockTimestamp + 1_000);
         uint maxShares = SavingsVaultProxy.maxRedeem(usdcWhale);
 
-        vm.expectRevert(bytes("SavingsVault: redeem more than max"));
+        vm.expectRevert(bytes("Redeem_max"));
         SavingsVaultProxy.redeem(maxShares + 1, usdcWhale, usdcWhale);
 
         assertLt(maxShares, SavingsVaultProxy.convertToShares(assets));
@@ -407,7 +406,7 @@ contract SavingsVaultTest is Test {
         vm.warp(block.timestamp + 1_000);
         uint maxAssetAmount = SavingsVaultProxy.maxWithdraw(usdcWhale);
 
-        vm.expectRevert(bytes("SavingsVault: withdraw more than max"));
+        vm.expectRevert(bytes("Withdraw_max"));
         SavingsVaultProxy.withdraw(maxAssetAmount + 1, usdcWhale, usdcWhale);
         assertLt(maxAssetAmount, assets);
 
@@ -576,7 +575,7 @@ contract SavingsVaultTest is Test {
         usdc.approve(address(SavingsVaultProxy), type(uint).max);
         SavingsVaultProxy.deposit(amount, usdcWhale);
         SavingsVaultProxy.harvest(amount);
-        vm.warp(block.timestamp + SavingsVaultProxy.timeout() + 1);
+        vm.warp(block.timestamp + 1 days + 1);
 
         SavingsVaultProxy.deposit(amount, usdcWhale);
         ISavingsVault.NotionalMarket[] memory markets = SavingsVaultProxy.__getThreeAndSixMonthMarkets();
@@ -814,7 +813,7 @@ contract SavingsVaultTest is Test {
         // Next slot is timeout, currencyId, maxLoss and notionalRouter inside SavingsVault
         assertEq(
             load(address(SavingsVaultProxy), 504),
-            0x000000001344a36a1b56144c3bc62e7757377d288fde03692328000300015180
+            0x00000000000000001344a36a1b56144c3bc62e7757377d288fde036923280003
         );
 
         // Next slot is wrappedfCashFactory inside SavingsVault
@@ -843,10 +842,10 @@ contract SavingsVaultTest is Test {
     }
 
     function testMaxImpliedRateFuzzing(uint16 _maxLoss) public {
-        vm.assume(maxLoss < 10_000);
+        vm.assume(_maxLoss < 10_000 && _maxLoss > 0);
         vm.startPrank(usdcWhale);
-        SavingsVaultProxy.setMaxLoss(maxLoss);
-        uint maxImpliedRate = SavingsVaultProxy.__getMaxImpliedRate(311111111);
+        SavingsVaultProxy.setMaxLoss(_maxLoss);
+        assertLt(SavingsVaultProxy.__getMaxImpliedRate(311111111), type(uint32).max);
         vm.stopPrank();
     }
 

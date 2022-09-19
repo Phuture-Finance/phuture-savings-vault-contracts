@@ -34,7 +34,7 @@ contract MockSavingsVault is SavingsVault {
     }
 
     function __getMaxImpliedRate(uint32 _oracleRate) public view returns (uint32) {
-        return _getMaxImpliedRate(_oracleRate);
+        return _getMaxImpliedRate(_oracleRate, maxLoss);
     }
 
     function getAUMFee(uint _lastTransfer) public view returns (uint) {
