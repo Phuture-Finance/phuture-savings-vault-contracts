@@ -213,7 +213,7 @@ contract SavingsVault is
         address _receiver,
         address _owner,
         uint16 _maxLoss
-    ) public returns (uint256) {
+    ) public isValidMaxLoss(_maxLoss) returns (uint256) {
         require(_shares <= maxRedeem(_owner), "Redeem_max");
         // input shares equal to _shares = sharesToBurn + sharesToBurn * burning_fee.
         // By solving the equation for sharesToBurn we can calculate the fee by subtracting sharesToBurn from the input _shares

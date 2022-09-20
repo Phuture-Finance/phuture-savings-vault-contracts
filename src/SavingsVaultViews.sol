@@ -21,6 +21,9 @@ import "./libraries/TypeConversionLibrary.sol";
 /// @notice Contains helper view functions
 contract SavingsVaultViews is ISavingsVaultViews {
     /// @inheritdoc ISavingsVaultViews
+    uint16 public constant BP = 10_000;
+
+    /// @inheritdoc ISavingsVaultViews
     function getAPY(ISavingsVaultViewer _savingsVault) external view returns (uint) {
         uint16 currencyId = _savingsVault.currencyId();
         address[2] memory fCashPositions = _savingsVault.getfCashPositions();
@@ -66,7 +69,7 @@ contract SavingsVaultViews is ISavingsVaultViews {
             block.timestamp,
             true
         );
-        uint scalingAmount = (fCashAmount * _percentage) / 100;
+        uint scalingAmount = (fCashAmount * _percentage) / BP;
         for (uint i = 0; i <= _steps; ) {
             try
                 calculationViews.getDepositFromfCashLend(
@@ -122,8 +125,7 @@ contract SavingsVaultViews is ISavingsVaultViews {
             .sortMarketsByOracleRate();
         maturity = highestYieldMarket.maturity;
         minImpliedRate = TypeConversionLibrary._safeUint32(
-            (highestYieldMarket.oracleRate * ISavingsVaultViewer(_savingsVault).maxLoss()) /
-                ISavingsVaultViewer(_savingsVault).BP()
+            (highestYieldMarket.oracleRate * ISavingsVaultViewer(_savingsVault).maxLoss()) / BP
         );
         currencyId = ISavingsVaultViewer(_savingsVault).currencyId();
         calculationViews = INotionalV2(ISavingsVaultViewer(_savingsVault).notionalRouter());

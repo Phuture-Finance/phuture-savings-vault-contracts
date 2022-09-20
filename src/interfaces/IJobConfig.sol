@@ -17,8 +17,8 @@ interface IJobConfig {
     /// @return Returns number of steps for scaling
     function SCALING_STEPS() external view returns (uint);
 
-    /// @notice Percentage scaled each step
-    /// @return Returns percentage scaled each step
+    /// @notice Percentage scaled each step in BP
+    /// @return Returns percentage scaled each step in BP
     function SCALING_PERCENTAGE() external view returns (uint);
 
     /// @notice Sets harvesting amount specification

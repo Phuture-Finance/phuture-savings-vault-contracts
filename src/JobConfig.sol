@@ -14,7 +14,7 @@ contract JobConfig is IJobConfig, Ownable {
     /// @inheritdoc IJobConfig
     uint public constant SCALING_STEPS = 3;
     /// @inheritdoc IJobConfig
-    uint public constant SCALING_PERCENTAGE = 30;
+    uint public constant SCALING_PERCENTAGE = 3000;
     /// @inheritdoc IJobConfig
     HarvestingSpecification public harvestingSpecification;
     /// @inheritdoc IJobConfig

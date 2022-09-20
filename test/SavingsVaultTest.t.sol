@@ -849,6 +849,27 @@ contract SavingsVaultTest is Test {
         vm.stopPrank();
     }
 
+    function testMaxImpliedRate() public {
+        vm.startPrank(usdcWhale);
+        SavingsVaultProxy.setMaxLoss(0);
+        assertEq(SavingsVaultProxy.__getMaxImpliedRate(311111111), type(uint32).max);
+        SavingsVaultProxy.setMaxLoss(9500);
+        assertEq(SavingsVaultProxy.__getMaxImpliedRate(type(uint32).max), type(uint32).max);
+    }
+
+    function testRedeemWithMaxLoss() public {
+        vm.startPrank(usdcWhale);
+        usdc.approve(address(SavingsVaultProxy), type(uint).max);
+        SavingsVaultProxy.deposit(100_000 * 1e6, usdcWhale);
+        SavingsVaultProxy.harvest(type(uint).max);
+        SavingsVaultProxy.redeemWithMaxLoss(100_000 * 1e6, usdcWhale, usdcWhale, 0);
+        SavingsVaultProxy.redeemWithMaxLoss(100_000 * 1e6, usdcWhale, usdcWhale, 10_000);
+        vm.expectRevert(bytes("Max_loss"));
+        SavingsVaultProxy.redeemWithMaxLoss(100_000 * 1e6, usdcWhale, usdcWhale, 10_001);
+        SavingsVaultProxy.redeemWithMaxLoss(SavingsVaultProxy.balanceOf(usdcWhale), usdcWhale, usdcWhale, 9200);
+        vm.stopPrank();
+    }
+
     // Notional tests
 
     function testGetfCashLendFromDeposit(uint32 minImpliedRate) public {

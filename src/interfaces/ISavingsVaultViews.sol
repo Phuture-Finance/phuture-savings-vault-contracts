@@ -9,6 +9,10 @@ import "../external/notional/interfaces/INotionalV2.sol";
 /// @title Fixed rate product vault helper view functions interface
 /// @notice Describes helper view functions
 interface ISavingsVaultViews {
+    /// @notice Base point number
+    /// @return Returns base point number
+    function BP() external view returns (uint16);
+
     /// @notice Spot annual percentage yield(APY) of the Savings Vault
     /// @param _savingsVault Address of the vault
     /// @return Returns APY of the vault with the precision of 1,000,000,000 units i.e. 37264168 equals to 3.7264168%
@@ -19,10 +23,10 @@ interface ISavingsVaultViews {
     /// @return maxDepositedAmount  max deposited amount available
     function getMaxDepositedAmount(address _savingsVault) external view returns (uint maxDepositedAmount);
 
-    /// @notice Scales down the passed amount if there is price slippage. Make sure that:  percentage * steps < 10
+    /// @notice Scales down the passed amount if there is price slippage.
     /// @param _savingsVault Address of the vault
     /// @param _amount Amount to scale down
-    /// @param _percentage Percentage of initial amount to scale down during each step.
+    /// @param _percentage Percentage of initial amount to scale down during each step in BP.
     /// @param _steps Number of iterations for scaling down.
     /// @return Scaled amount
     function scaleAmount(
