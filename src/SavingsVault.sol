@@ -454,7 +454,7 @@ contract SavingsVault is
                 highestYieldFCash.redeemToUnderlying(fCashAmountToWithdraw, address(this), maxImpliedRate);
             } else {
                 // Withdraw everything from highest yield maturity
-                lowestYieldFCash.redeemToUnderlying(fCashAmountHighestYieldMaturity, address(this), maxImpliedRate);
+                highestYieldFCash.redeemToUnderlying(fCashAmountHighestYieldMaturity, address(this), maxImpliedRate);
             }
         }
         return _asset.balanceOf(address(this));
