@@ -9,7 +9,7 @@ async function main() {
   const savingsVault = SavingsVault__factory.connect(parseEthAddress('SAVINGS_VAULT'), account)
   await savingsVault.approve(savingsVault.address, ethers.constants.MaxUint256)
   await savingsVault['redeem(uint256,address,address)'](
-    parseBigNumber('AMOUNT', 6),
+    parseBigNumber('AMOUNT', 18),
     parseEthAddress('RECEIVER'),
     account.address
   )
