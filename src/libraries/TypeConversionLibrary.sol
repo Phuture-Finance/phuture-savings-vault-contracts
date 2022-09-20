@@ -6,7 +6,7 @@ library TypeConversionLibrary {
     /// @notice Safe downcast from uint256 to uint88
     /// @param _x value to downcast
     function _safeUint88(uint256 _x) internal pure returns (uint88) {
-        require(_x <= uint256(type(uint88).max), "overflow");
+        require(_x <= uint256(type(uint88).max), "Overflow");
         return uint88(_x);
     }
 
