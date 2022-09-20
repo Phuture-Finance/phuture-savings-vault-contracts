@@ -694,7 +694,7 @@ contract SavingsVaultTest is Test {
         SavingsVaultProxy.upgradeTo(address(new SavingsVault()));
     }
 
-    function testDepositWithPermit() public {
+    function testdeposit() public {
         vm.startPrank(usdcWhale);
         uint signerPrivateKey = 0xA11CE;
         address signer = vm.addr(signerPrivateKey);
@@ -715,7 +715,7 @@ contract SavingsVaultTest is Test {
 
         vm.startPrank(signer);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, digest);
-        SavingsVaultProxy.depositWithPermit(assets, signer, permit.deadline, v, r, s);
+        SavingsVaultProxy.deposit(assets, signer, permit.deadline, v, r, s);
         vm.stopPrank();
 
         assertEq(SavingsVaultProxy.balanceOf(signer), 99800399201596806388);
@@ -845,16 +845,16 @@ contract SavingsVaultTest is Test {
         vm.assume(_maxLoss < 10_000 && _maxLoss > 0);
         vm.startPrank(usdcWhale);
         SavingsVaultProxy.setMaxLoss(_maxLoss);
-        assertLt(SavingsVaultProxy.__getMaxImpliedRate(311111111), type(uint32).max);
+        assertLt(SavingsVaultProxy._getMaxImpliedRate(311111111), type(uint32).max);
         vm.stopPrank();
     }
 
     function testMaxImpliedRate() public {
         vm.startPrank(usdcWhale);
         SavingsVaultProxy.setMaxLoss(0);
-        assertEq(SavingsVaultProxy.__getMaxImpliedRate(311111111), type(uint32).max);
+        assertEq(SavingsVaultProxy._getMaxImpliedRate(311111111), type(uint32).max);
         SavingsVaultProxy.setMaxLoss(9500);
-        assertEq(SavingsVaultProxy.__getMaxImpliedRate(type(uint32).max), type(uint32).max);
+        assertEq(SavingsVaultProxy._getMaxImpliedRate(type(uint32).max), type(uint32).max);
     }
 
     function testredeem() public {

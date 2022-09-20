@@ -268,7 +268,7 @@ contract SavingsVault is
     }
 
     /// @inheritdoc ISavingsVault
-    function depositWithPermit(
+    function deposit(
         uint _assets,
         address _receiver,
         uint _deadline,

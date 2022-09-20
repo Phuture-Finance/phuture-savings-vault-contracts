@@ -61,7 +61,7 @@ interface ISavingsVault {
     /// @param _r The first 64 bytes of the signed data
     /// @param _s Bytes [64…128] of the signed data
     /// @return Amount of savings vault shares to be minted for the given assets
-    function depositWithPermit(
+    function deposit(
         uint256 _assets,
         address _receiver,
         uint _deadline,
