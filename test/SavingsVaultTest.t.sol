@@ -430,6 +430,19 @@ contract SavingsVaultTest is Test {
         vm.stopPrank();
     }
 
+    function testRedeemWithMaxLoss() public {
+        vm.startPrank(usdcWhale);
+        usdc.approve(address(SavingsVaultProxy), type(uint).max);
+        SavingsVaultProxy.deposit(100_000 * 1e6, usdcWhale);
+        SavingsVaultProxy.harvest(type(uint).max);
+        SavingsVaultProxy.redeemWithMaxLoss(100_000 * 1e6, usdcWhale, usdcWhale, 0);
+        SavingsVaultProxy.redeemWithMaxLoss(100_000 * 1e6, usdcWhale, usdcWhale, 10_000);
+        vm.expectRevert(bytes("Max_loss"));
+        SavingsVaultProxy.redeemWithMaxLoss(100_000 * 1e6, usdcWhale, usdcWhale, 10_001);
+        SavingsVaultProxy.redeemWithMaxLoss(SavingsVaultProxy.balanceOf(usdcWhale), usdcWhale, usdcWhale, 9200);
+        vm.stopPrank();
+    }
+
     function testDepositFuzzing(uint assets) public {
         vm.assume(assets < 100_000 * 1e6 && assets > 1);
 
@@ -694,7 +707,7 @@ contract SavingsVaultTest is Test {
         SavingsVaultProxy.upgradeTo(address(new SavingsVault()));
     }
 
-    function testdeposit() public {
+    function testDepositWithPermit() public {
         vm.startPrank(usdcWhale);
         uint signerPrivateKey = 0xA11CE;
         address signer = vm.addr(signerPrivateKey);
@@ -715,7 +728,7 @@ contract SavingsVaultTest is Test {
 
         vm.startPrank(signer);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, digest);
-        SavingsVaultProxy.deposit(assets, signer, permit.deadline, v, r, s);
+        SavingsVaultProxy.depositWithPermit(assets, signer, permit.deadline, v, r, s);
         vm.stopPrank();
 
         assertEq(SavingsVaultProxy.balanceOf(signer), 99800399201596806388);
@@ -857,18 +870,6 @@ contract SavingsVaultTest is Test {
         assertEq(SavingsVaultProxy._getMaxImpliedRate(type(uint32).max), type(uint32).max);
     }
 
-    function testredeem() public {
-        vm.startPrank(usdcWhale);
-        usdc.approve(address(SavingsVaultProxy), type(uint).max);
-        SavingsVaultProxy.deposit(100_000 * 1e6, usdcWhale);
-        SavingsVaultProxy.harvest(type(uint).max);
-        SavingsVaultProxy.redeem(100_000 * 1e6, usdcWhale, usdcWhale, 0);
-        SavingsVaultProxy.redeem(100_000 * 1e6, usdcWhale, usdcWhale, 10_000);
-        vm.expectRevert(bytes("Max_loss"));
-        SavingsVaultProxy.redeem(100_000 * 1e6, usdcWhale, usdcWhale, 10_001);
-        SavingsVaultProxy.redeem(SavingsVaultProxy.balanceOf(usdcWhale), usdcWhale, usdcWhale, 9200);
-        vm.stopPrank();
-    }
 
     // Notional tests
 

@@ -204,11 +204,11 @@ contract SavingsVault is
         address _receiver,
         address _owner
     ) public override returns (uint256) {
-        return redeem(_shares, _receiver, _owner, 0);
+        return redeemWithMaxLoss(_shares, _receiver, _owner, 0);
     }
 
     /// @inheritdoc ISavingsVault
-    function redeem(
+    function redeemWithMaxLoss(
         uint256 _shares,
         address _receiver,
         address _owner,
@@ -268,7 +268,7 @@ contract SavingsVault is
     }
 
     /// @inheritdoc ISavingsVault
-    function deposit(
+    function depositWithPermit(
         uint _assets,
         address _receiver,
         uint _deadline,
@@ -511,7 +511,7 @@ contract SavingsVault is
                 );
                 assetsWithdrawnFromHighestYieldMaturity = highestYieldFCash.previewRedeem(fCashAmountToWithdraw);
             } else {
-                // Withdraw everything from highest yield maturity
+                // Amount to withdraw is everything from highest yield fCash
                 assetsWithdrawnFromHighestYieldMaturity = highestYieldFCash.previewRedeem(
                     fCashAmountHighestYieldMaturity
                 );
