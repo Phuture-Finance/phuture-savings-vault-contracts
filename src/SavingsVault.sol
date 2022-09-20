@@ -443,19 +443,16 @@ contract SavingsVault is
         IWrappedfCashComplete highestYieldFCash = IWrappedfCashComplete(highestYieldNotionalMarket.wrappedfCash);
         uint fCashAmountHighestYieldMaturity = highestYieldFCash.balanceOf(address(this));
         if (fCashAmountHighestYieldMaturity > 0) {
-            uint32 maxImpliedRate = _getMaxImpliedRate(highestYieldNotionalMarket.oracleRate, _maxLoss);
             uint valueOfHighestYieldfCash = highestYieldFCash.convertToAssets(fCashAmountHighestYieldMaturity);
             if (valueOfHighestYieldfCash >= assetsToWithdrawFromMaturities) {
                 // Amount to withdraw is the percentage of the available highest yield fCash
-                uint fCashAmountToWithdraw = assetsToWithdrawFromMaturities.mulDiv(
+                fCashAmountHighestYieldMaturity = assetsToWithdrawFromMaturities.mulDiv(
                     fCashAmountHighestYieldMaturity,
                     valueOfHighestYieldfCash
                 );
-                highestYieldFCash.redeemToUnderlying(fCashAmountToWithdraw, address(this), maxImpliedRate);
-            } else {
-                // Withdraw everything from highest yield maturity
-                highestYieldFCash.redeemToUnderlying(fCashAmountHighestYieldMaturity, address(this), maxImpliedRate);
             }
+            uint32 maxImpliedRate = _getMaxImpliedRate(highestYieldNotionalMarket.oracleRate, _maxLoss);
+            highestYieldFCash.redeemToUnderlying(fCashAmountHighestYieldMaturity, address(this), maxImpliedRate);
         }
         return _asset.balanceOf(address(this));
     }
