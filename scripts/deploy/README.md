@@ -19,12 +19,11 @@
 - `NOTIONAL_ROUTER` - [address of Notional router](https://docs.notional.finance/developer-documentation/#deployed-contract-addresses)
 - `MAX_LOSS` - maxLoss allowed during harvesting/withdrawal in [0 - 10_00] range
 - `FEE_RECIPIENT` - address to receive fees during minting/burning
-- `TIMEOUT` - minimum time required to pass between two harvests
 - `GAS_LIMIT_IMPLEMENTATION` - gas limit for implementation deployment
 - `GAS_LIMIT_PROXY` - gas limit for proxy deployment and initialization
 
 ```shell
-gasPriceGwei={GAS_PRICE_GWEI} name={NAME} symbol={SYMBOL} asset={ASSET} currencyId={CURRENCY_ID} wrappedfCashFactory={WRAPPED_FCASH_FACTORY} notionalRouter={NOTIONAL_ROUTER} maxLoss={MAX_LOSS} feeRecipient={FEE_RECIPIENT} timeout={TIMEOUT} gasLimitImpl={GAS_LIMIT_IMPLEMENTATION} gasLimitProxy={GAS_LIMIT_PROXY} npx hardhat run --network {NETWORK} scripts/deploy/001-savings-vault.deploy.ts 
+gasPriceGwei={GAS_PRICE_GWEI} name={NAME} symbol={SYMBOL} asset={ASSET} currencyId={CURRENCY_ID} wrappedfCashFactory={WRAPPED_FCASH_FACTORY} notionalRouter={NOTIONAL_ROUTER} maxLoss={MAX_LOSS} feeRecipient={FEE_RECIPIENT} gasLimitImpl={GAS_LIMIT_IMPLEMENTATION} gasLimitProxy={GAS_LIMIT_PROXY} npx hardhat run --network {NETWORK} scripts/deploy/001-savings-vault.deploy.ts 
 ```
 
 ### 2. Deploy SavingsVaultViews

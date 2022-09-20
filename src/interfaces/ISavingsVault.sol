@@ -76,7 +76,7 @@ interface ISavingsVault {
     /// @param _owner Address which owns the shares
     /// @param _maxLoss Maximum loss allowed during withdrawal
     /// @return Amount of assets received for the given shares
-    function redeemWithMaxLoss(
+    function redeem(
         uint256 _shares,
         address _receiver,
         address _owner,

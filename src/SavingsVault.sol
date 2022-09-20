@@ -204,11 +204,11 @@ contract SavingsVault is
         address _receiver,
         address _owner
     ) public override returns (uint256) {
-        return redeemWithMaxLoss(_shares, _receiver, _owner, 0);
+        return redeem(_shares, _receiver, _owner, 0);
     }
 
     /// @inheritdoc ISavingsVault
-    function redeemWithMaxLoss(
+    function redeem(
         uint256 _shares,
         address _receiver,
         address _owner,

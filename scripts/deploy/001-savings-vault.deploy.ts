@@ -15,7 +15,6 @@ async function main() {
     notionalRouter,
     maxLoss,
     feeRecipient,
-    timeout,
     gasPrice,
     gasLimitImpl,
     gasLimitProxy
@@ -29,7 +28,6 @@ async function main() {
     notionalRouter: parseEthAddress('NOTIONAL_ROUTER'),
     maxLoss: parseBigNumber('MAX_LOSS', 0),
     feeRecipient: parseEthAddress('FEE_RECIPIENT'),
-    timeout: parseBigNumber('TIMEOUT', 0),
     gasPrice: parseBigNumber('GAS_PRICE_GWEI', 9).toString(),
     gasLimitImpl: parseBigNumber('GAS_LIMIT_IMPLEMENTATION', 6).toString(),
     gasLimitProxy: parseBigNumber('GAS_LIMIT_PROXY', 6).toString()
@@ -52,8 +50,7 @@ async function main() {
     wrappedfCashFactory,
     notionalRouter,
     maxLoss,
-    feeRecipient,
-    timeout
+    feeRecipient
   ])
   await deploy.withVerification('SavingsVault proxy', new ERC1967Proxy__factory(deployer), impl.address, data, {
     gasPrice,
