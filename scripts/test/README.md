@@ -1,11 +1,13 @@
 # Saving vault tests
 
-To get index info you need to provide:
+To execute savings vault transactions you need to provide:
 
 - `ACCOUNT` - address of sender
 - `SAVINGS_VAULT` - address of `SavingsVault` contract
+- `JOB_CONFIG` - address of `JobConfig` contract
 - `AMOUNT` - amount of assets/shares to deposit/redeem
 - `RECEIVER` - address of assets/shares receiver
+- `MAX_LOSS` - max loss
 
 ## Run node
 
@@ -22,7 +24,7 @@ ACCOUNT={ACCOUNT} RECEIVER={RECEIVER} SAVINGS_VAULT={SAVINGS_VAULT} AMOUNT={AMOU
 ## Redeem
 
 ```bash
-ACCOUNT={ACCOUNT} RECEIVER={RECEIVER} SAVINGS_VAULT={SAVINGS_VAULT} AMOUNT={AMOUNT} npx hardhat run --network local scripts/test/redeem.ts
+ACCOUNT={ACCOUNT} RECEIVER={RECEIVER} SAVINGS_VAULT={SAVINGS_VAULT} AMOUNT={AMOUNT} MAX_LOSS={MAX_LOSS} npx hardhat run --network local scripts/test/redeem.ts
 ```
 
 ## Harvest
