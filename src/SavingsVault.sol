@@ -192,7 +192,7 @@ contract SavingsVault is
             _chargeAUMFee();
         }
         // shares accounting for the fees are not burned since they are transferred to the feeRecipient
-        uint assetsWithdrawn = _beforeWithdraw(_assets, 0);
+        uint assetsWithdrawn = _beforeWithdraw(_assets);
         _withdraw(msg.sender, _receiver, _owner, assetsWithdrawn, shares);
         // returns the shares plus fee
         return shares + fee;
@@ -204,16 +204,16 @@ contract SavingsVault is
         address _receiver,
         address _owner
     ) public override returns (uint256) {
-        return redeemWithMaxLoss(_shares, _receiver, _owner, 0);
+        return redeemWithMinOutputAmount(_shares, _receiver, _owner, 0);
     }
 
     /// @inheritdoc ISavingsVault
-    function redeemWithMaxLoss(
+    function redeemWithMinOutputAmount(
         uint256 _shares,
         address _receiver,
         address _owner,
-        uint16 _maxLoss
-    ) public isValidMaxLoss(_maxLoss) returns (uint256) {
+        uint _minOutputAmount
+    ) public returns (uint256) {
         require(_shares <= maxRedeem(_owner), "Redeem_max");
         // input shares equal to _shares = sharesToBurn + sharesToBurn * burning_fee.
         // By solving the equation for sharesToBurn we can calculate the fee by subtracting sharesToBurn from the input _shares
@@ -228,7 +228,8 @@ contract SavingsVault is
         } else {
             _chargeAUMFee();
         }
-        uint assetsWithdrawn = _beforeWithdraw(assets, _maxLoss);
+        uint assetsWithdrawn = _beforeWithdraw(assets);
+        require(assetsWithdrawn >= _minOutputAmount, "Redeem_min");
         _withdraw(msg.sender, _receiver, _owner, assetsWithdrawn, sharesToBurn);
 
         return assetsWithdrawn;
@@ -401,7 +402,7 @@ contract SavingsVault is
 
     /// @notice Withdraws asset from maturities
     /// @param _assets Amount of assets for withdrawal
-    function _beforeWithdraw(uint _assets, uint16 _maxLoss) internal returns (uint) {
+    function _beforeWithdraw(uint _assets) internal returns (uint) {
         IERC20MetadataUpgradeable _asset = IERC20MetadataUpgradeable(asset());
         uint assetBalance = _asset.balanceOf(address(this));
         // There is enough assets in the vault, no need to withdraw from fCash positions
@@ -416,7 +417,6 @@ contract SavingsVault is
         IWrappedfCashComplete lowestYieldFCash = IWrappedfCashComplete(lowestYieldNotionalMarket.wrappedfCash);
         uint fCashAmountLowestYieldMaturity = lowestYieldFCash.balanceOf(address(this));
         if (fCashAmountLowestYieldMaturity > 0) {
-            uint32 maxImpliedRate = _getMaxImpliedRate(lowestYieldNotionalMarket.oracleRate, _maxLoss);
             uint valueOfLowestYieldfCash = lowestYieldFCash.convertToAssets(fCashAmountLowestYieldMaturity);
             if (valueOfLowestYieldfCash >= assetsToWithdrawFromMaturities) {
                 // Amount to withdraw is the percentage of the available lowest yield fCash
@@ -424,17 +424,16 @@ contract SavingsVault is
                     fCashAmountLowestYieldMaturity,
                     valueOfLowestYieldfCash
                 );
-                lowestYieldFCash.redeemToUnderlying(fCashAmountToWithdraw, address(this), maxImpliedRate);
+                lowestYieldFCash.redeemToUnderlying(fCashAmountToWithdraw, address(this), type(uint32).max);
                 return _asset.balanceOf(address(this));
             } else {
                 // We need to redeem everything from lowestYieldMaturity and move onto the highest yield maturity
-                lowestYieldFCash.redeemToUnderlying(fCashAmountLowestYieldMaturity, address(this), maxImpliedRate);
-                assetBalance = _asset.balanceOf(address(this));
-                if (assetBalance >= _assets) {
+                lowestYieldFCash.redeemToUnderlying(fCashAmountLowestYieldMaturity, address(this), type(uint32).max);
+                if (assetBalance + valueOfLowestYieldfCash >= _assets) {
                     // somehow we have withdrawn enough assets, return the assets
                     return _assets;
                 } else {
-                    assetsToWithdrawFromMaturities = _assets - assetBalance;
+                    assetsToWithdrawFromMaturities -= valueOfLowestYieldfCash;
                 }
             }
         }
@@ -450,8 +449,7 @@ contract SavingsVault is
                     valueOfHighestYieldfCash
                 );
             }
-            uint32 maxImpliedRate = _getMaxImpliedRate(highestYieldNotionalMarket.oracleRate, _maxLoss);
-            highestYieldFCash.redeemToUnderlying(fCashAmountHighestYieldMaturity, address(this), maxImpliedRate);
+            highestYieldFCash.redeemToUnderlying(fCashAmountHighestYieldMaturity, address(this), type(uint32).max);
         }
         return _asset.balanceOf(address(this));
     }
@@ -489,7 +487,7 @@ contract SavingsVault is
                     // somehow we have withdrawn enough assets, return the assets
                     return _assets;
                 } else {
-                    assetsToWithdrawFromMaturities = _assets - assetBalance - assetsWithdrawnFromLowestYieldMaturity;
+                    assetsToWithdrawFromMaturities -= assetsWithdrawnFromLowestYieldMaturity;
                 }
             }
         }
@@ -606,15 +604,6 @@ contract SavingsVault is
 
     /// @inheritdoc UUPSUpgradeable
     function _authorizeUpgrade(address _newImpl) internal view virtual override onlyRole(VAULT_MANAGER_ROLE) {}
-
-    /// @notice Calculates maxImpliedRate based on the oracleRate and maxLoss specified
-    function _getMaxImpliedRate(uint32 _oracleRate, uint16 _maxLoss) internal pure returns (uint32) {
-        if (_oracleRate == type(uint32).max || _maxLoss == 0) {
-            return type(uint32).max;
-        }
-        uint numerator = 2 * BP - _maxLoss;
-        return TypeConversionLibrary._safeUint32((_oracleRate * numerator) / BP);
-    }
 
     uint256[45] private __gap;
 }

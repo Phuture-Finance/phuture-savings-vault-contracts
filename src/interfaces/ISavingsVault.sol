@@ -62,7 +62,7 @@ interface ISavingsVault {
     /// @param _s Bytes [64…128] of the signed data
     /// @return Amount of savings vault shares to be minted for the given assets
     function depositWithPermit(
-        uint256 _assets,
+        uint _assets,
         address _receiver,
         uint _deadline,
         uint8 _v,
@@ -74,12 +74,12 @@ interface ISavingsVault {
     /// @param _shares Amount shares to burn
     /// @param _receiver Address which receives the assets
     /// @param _owner Address which owns the shares
-    /// @param _maxLoss Maximum loss allowed during withdrawal
+    /// @param _minOutputAmount Minimum amount of assets to receive
     /// @return Amount of assets received for the given shares
-    function redeemWithMaxLoss(
-        uint256 _shares,
+    function redeemWithMinOutputAmount(
+        uint _shares,
         address _receiver,
         address _owner,
-        uint16 _maxLoss
+        uint _minOutputAmount
     ) external returns (uint);
 }

@@ -21,20 +21,8 @@ contract MockSavingsVault is SavingsVault {
         return VAULT_MANAGER_ROLE;
     }
 
-    function _fCashPositions() public view returns (address[] memory) {
-        address[] memory positions = new address[](2);
-        for (uint i = 0; i < 2; i++) {
-            positions[i] = fCashPositions[i];
-        }
-        return positions;
-    }
-
     function __getThreeAndSixMonthMarkets() public view returns (NotionalMarket[] memory) {
         return _getThreeAndSixMonthMarkets();
-    }
-
-    function _getMaxImpliedRate(uint32 _oracleRate) public view returns (uint32) {
-        return _getMaxImpliedRate(_oracleRate, maxLoss);
     }
 
     function getAUMFee(uint _lastTransfer) public view returns (uint) {

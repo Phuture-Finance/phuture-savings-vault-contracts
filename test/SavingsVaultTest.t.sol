@@ -95,7 +95,7 @@ contract SavingsVaultTest is Test {
         assertEq(SavingsVaultProxy._feeRecipient(), feeRecipient);
         assertEq(SavingsVaultProxy._lastTransferTime(), block.timestamp);
 
-        address[] memory positions = SavingsVaultProxy._fCashPositions();
+        address[2] memory positions = SavingsVaultProxy.getfCashPositions();
         assertEq(positions.length, 2);
         address lowestYieldFCash = address(0xF1e1a4213F241d8fE23990Fc16e14eAf37a27028);
         address highestYieldFCash = address(0x69c6B313506684f49c564B48bF0E4d41c0Cb1A3e);
@@ -192,7 +192,7 @@ contract SavingsVaultTest is Test {
         //*****1st case => Harvest with _maxDepositedAmount lower than the assetBalance******
         uint scalingAmount = 100_000 * 1e6;
         uint maxDepositedAmount = amount - scalingAmount;
-        IWrappedfCashComplete highestYieldFCash = IWrappedfCashComplete(SavingsVaultProxy._fCashPositions()[1]);
+        IWrappedfCashComplete highestYieldFCash = IWrappedfCashComplete(SavingsVaultProxy.getfCashPositions()[1]);
         uint fCashAmount = highestYieldFCash.previewDeposit(maxDepositedAmount);
 
         // invoke harvest and assert event emitted
@@ -249,7 +249,7 @@ contract SavingsVaultTest is Test {
     }
 
     function testHarvestingWithZeroBalance() public {
-        IWrappedfCashComplete highestYieldFCash = IWrappedfCashComplete(SavingsVaultProxy._fCashPositions()[1]);
+        IWrappedfCashComplete highestYieldFCash = IWrappedfCashComplete(SavingsVaultProxy.getfCashPositions()[1]);
         vm.prank(setupMsgSender);
         SavingsVaultProxy.harvest(type(uint).max);
         assertEq(highestYieldFCash.balanceOf(address(SavingsVaultProxy)), 0);
@@ -271,7 +271,7 @@ contract SavingsVaultTest is Test {
         assertEq(SavingsVaultProxy.balanceOf(feeRecipient), 1996007984031936127744);
 
         // withdrawing half of the amount
-        IWrappedfCashComplete highestYieldFCash = IWrappedfCashComplete(SavingsVaultProxy._fCashPositions()[1]);
+        IWrappedfCashComplete highestYieldFCash = IWrappedfCashComplete(SavingsVaultProxy.getfCashPositions()[1]);
         uint fCashAmount = highestYieldFCash.previewWithdraw(amount / 2 - usdc.balanceOf(address(SavingsVaultProxy)));
 
         vm.warp(block.timestamp + 1_000);
@@ -427,19 +427,6 @@ contract SavingsVaultTest is Test {
         SavingsVaultProxy.redeem(SavingsVaultProxy.balanceOf(usdcWhale), usdcWhale, usdcWhale);
         assertEq(SavingsVaultProxy.balanceOf(usdcWhale), 0);
 
-        vm.stopPrank();
-    }
-
-    function testRedeemWithMaxLoss() public {
-        vm.startPrank(usdcWhale);
-        usdc.approve(address(SavingsVaultProxy), type(uint).max);
-        SavingsVaultProxy.deposit(100_000 * 1e6, usdcWhale);
-        SavingsVaultProxy.harvest(type(uint).max);
-        SavingsVaultProxy.redeemWithMaxLoss(100_000 * 1e6, usdcWhale, usdcWhale, 0);
-        SavingsVaultProxy.redeemWithMaxLoss(100_000 * 1e6, usdcWhale, usdcWhale, 10_000);
-        vm.expectRevert(bytes("Max_loss"));
-        SavingsVaultProxy.redeemWithMaxLoss(100_000 * 1e6, usdcWhale, usdcWhale, 10_001);
-        SavingsVaultProxy.redeemWithMaxLoss(SavingsVaultProxy.balanceOf(usdcWhale), usdcWhale, usdcWhale, 9200);
         vm.stopPrank();
     }
 
@@ -605,7 +592,7 @@ contract SavingsVaultTest is Test {
         // Deposit some usdc without harvesting
         SavingsVaultProxy.deposit(6_000 * 1e6, usdcWhale);
 
-        address[] memory positions = SavingsVaultProxy._fCashPositions();
+        address[2] memory positions = SavingsVaultProxy.getfCashPositions();
         IWrappedfCashComplete lowestYieldFCash = IWrappedfCashComplete(positions[0]);
         IWrappedfCashComplete highestYieldFCash = IWrappedfCashComplete(positions[1]);
 
@@ -619,13 +606,13 @@ contract SavingsVaultTest is Test {
         SavingsVaultProxy.redeem(SavingsVaultProxy.balanceOf(usdcWhale), usdcWhale, usdcWhale);
 
         assertEq(lowestYieldFCash.balanceOf(address(SavingsVaultProxy)), 0);
-        assertEq(highestYieldFCash.balanceOf(address(SavingsVaultProxy)), 17744358555);
+        assertEq(highestYieldFCash.balanceOf(address(SavingsVaultProxy)), 18309011835);
         assertEq(SavingsVaultProxy.balanceOf(usdcWhale), 0);
         assertEq(usdc.balanceOf(address(SavingsVaultProxy)), 0);
 
         uint balanceAfterWithdrawal = usdc.balanceOf(usdcWhale);
         // User losses certain amount of USDC due to slippage
-        assertEq(balanceBeforeDeposit - balanceAfterWithdrawal, 211920397);
+        assertEq(balanceBeforeDeposit - balanceAfterWithdrawal, 217499375);
 
         vm.stopPrank();
     }
@@ -662,7 +649,7 @@ contract SavingsVaultTest is Test {
 
         assertEq(dai.balanceOf(address(daiSavingsVault)), 2470000000000);
 
-        IWrappedfCashComplete highestYieldFCash = IWrappedfCashComplete(daiSavingsVault._fCashPositions()[1]);
+        IWrappedfCashComplete highestYieldFCash = IWrappedfCashComplete(daiSavingsVault.getfCashPositions()[1]);
 
         uint estimatedShares = daiSavingsVault.previewWithdraw(amount / 2);
 
@@ -854,30 +841,13 @@ contract SavingsVaultTest is Test {
         );
     }
 
-    function testMaxImpliedRateFuzzing(uint16 _maxLoss) public {
-        vm.assume(_maxLoss < 10_000 && _maxLoss > 0);
-        vm.startPrank(usdcWhale);
-        SavingsVaultProxy.setMaxLoss(_maxLoss);
-        assertLt(SavingsVaultProxy._getMaxImpliedRate(311111111), type(uint32).max);
-        vm.stopPrank();
-    }
-
-    function testMaxImpliedRate() public {
-        vm.startPrank(usdcWhale);
-        SavingsVaultProxy.setMaxLoss(0);
-        assertEq(SavingsVaultProxy._getMaxImpliedRate(311111111), type(uint32).max);
-        SavingsVaultProxy.setMaxLoss(9500);
-        assertEq(SavingsVaultProxy._getMaxImpliedRate(type(uint32).max), type(uint32).max);
-    }
-
-
     // Notional tests
 
     function testGetfCashLendFromDeposit(uint32 minImpliedRate) public {
         uint assets = 5_000_000 * 1e6;
         vm.assume(minImpliedRate < type(uint32).max && minImpliedRate > 0);
         INotionalV2 calculationViews = INotionalV2(notionalRouter);
-        address[] memory positions = SavingsVaultProxy._fCashPositions();
+        address[2] memory positions = SavingsVaultProxy.getfCashPositions();
         IWrappedfCashComplete fCash = IWrappedfCashComplete(positions[0]);
         (uint fCashAmount, , ) = calculationViews.getfCashLendFromDeposit(
             currencyId,
@@ -894,7 +864,7 @@ contract SavingsVaultTest is Test {
     function testFailsGetfCashLendFromDepositReverts(uint32 minImpliedRate) public {
         vm.assume(minImpliedRate < type(uint32).max && minImpliedRate > 0);
         INotionalV2 calculationViews = INotionalV2(notionalRouter);
-        address[] memory positions = SavingsVaultProxy._fCashPositions();
+        address[2] memory positions = SavingsVaultProxy.getfCashPositions();
         IWrappedfCashComplete fCash = IWrappedfCashComplete(positions[0]);
         // Function fails at around 6.3 million usdc
         (uint fCashAmount, , ) = calculationViews.getfCashLendFromDeposit(
@@ -929,6 +899,26 @@ contract SavingsVaultTest is Test {
         vm.startPrank(usdcWhale);
         usdc.approve(address(fCash), 995450937379);
         fCash.mintViaUnderlying(995450937379, 1_000_000 * 1e8, usdcWhale, 27309714);
+    }
+
+    function testGetPrincipalFromfCashBorow(uint32 maxBorrowRate) public {
+        uint shares = 1_000_000 * 1e8;
+        vm.assume(maxBorrowRate < type(uint32).max && maxBorrowRate > type(uint32).max / 125);
+        INotionalV2 calculationViews = INotionalV2(notionalRouter);
+        address[2] memory positions = SavingsVaultProxy.getfCashPositions();
+        IWrappedfCashComplete fCash = IWrappedfCashComplete(positions[0]);
+        (
+            uint256 borrowAmountUnderlying,
+            uint256 borrowAmountAsset,
+            uint8 marketIndex,
+            bytes32 encodedTrade
+        ) = calculationViews.getPrincipalFromfCashBorrow(
+                currencyId,
+                shares,
+                fCash.getMaturity(),
+                maxBorrowRate,
+                block.timestamp
+            );
     }
 
     // Internal helper functions for setting-up the system
