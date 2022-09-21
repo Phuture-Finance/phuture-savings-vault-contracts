@@ -8,7 +8,7 @@ import {
   SavingsVaultViews__factory,
   SavingsVault__factory
 } from '../../typechain-types'
-import { parseEthAddress, parseWallet } from '../../utils/parser'
+import {parseEthAddress, parseString, parseWallet} from '../../utils/parser'
 import { logger } from '../utils'
 
 function bnToFormattedString(value: BigNumber, decimals: number): string {
@@ -95,6 +95,15 @@ async function main() {
     'Max loss': bnToFormattedString(BigNumber.from(await savingsVault.maxLoss()), 2) + '%',
     'Scaled Amount': bnToFormattedString(await jobConfig.getDepositedAmount(savingsVault.address), 6),
     APY: bnToFormattedString(await savingsVaultViews.getAPY(savingsVault.address), 7) + '%'
+  })
+
+  const signerAddress = signer.address
+  const feeRecipientAddress = parseString('FEE_RECIPIENT')
+  console.log("USV balances")
+  console.table({
+    signerAddress: bnToFormattedString(await savingsVault.balanceOf(signerAddress), 18),
+    feeRecipientAddress: bnToFormattedString(await savingsVault.balanceOf(feeRecipientAddress), 18),
+
   })
 }
 
