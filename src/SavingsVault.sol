@@ -276,8 +276,7 @@ contract SavingsVault is
         bytes32 _r,
         bytes32 _s
     ) public override returns (uint) {
-        address _asset = asset();
-        ERC20PermitUpgradeable(_asset).permit(msg.sender, address(this), _assets, _deadline, _v, _r, _s);
+        ERC20PermitUpgradeable(asset()).permit(msg.sender, address(this), _assets, _deadline, _v, _r, _s);
         return deposit(_assets, _receiver);
     }
 

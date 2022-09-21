@@ -15,7 +15,7 @@ interface IHarvestingJob {
 
     /// @notice Harvests from vault
     /// @param _vault Address of the SavingsVault
-    function harvest(ISavingsVaultHarvester _vault) external;
+    function harvest(address _vault) external;
 
     /// @notice Sets timeout for harvesting
     /// @param _timeout Time between two harvests
