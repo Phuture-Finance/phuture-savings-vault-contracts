@@ -1,4 +1,3 @@
-import Decimal from 'decimal.js'
 import { BigNumber } from 'ethers'
 import {
   ERC20Upgradeable__factory,
@@ -10,15 +9,7 @@ import {
 } from '../../typechain-types'
 import { parseEthAddress, parseString, parseWallet } from '../../utils/parser'
 import { logger } from '../utils'
-
-function bnToFormattedString(value: BigNumber, decimals: number): string {
-  return new Decimal(value.toString()).div(BigNumber.from(10).pow(decimals).toString()).toString()
-}
-
-function timestampToFormattedTime(timestamp: BigNumber): string {
-  const date = new Date(timestamp.toNumber() * 1000)
-  return date.toLocaleString()
-}
+import { bnToFormattedString, timestampToFormattedTime } from '../utils/formatter'
 
 async function main() {
   const signer = parseWallet('PRIVATE_KEY')
@@ -54,7 +45,6 @@ async function main() {
       totalAssetsSpot = totalAssetsSpot.add(await fCashPosition.previewRedeem(fCashPositionBalance))
     }
   }
-
   console.log('USV data for redeem: ')
   console.table({
     'Total Assets': bnToFormattedString(totalAssetsSpot, 6),
@@ -97,12 +87,10 @@ async function main() {
     APY: bnToFormattedString(await savingsVaultViews.getAPY(savingsVault.address), 7) + '%'
   })
 
-  const signerAddress = signer.address
-  const feeRecipientAddress = parseString('FEE_RECIPIENT')
   console.log('USV balances')
   console.table({
-    signerAddress: bnToFormattedString(await savingsVault.balanceOf(signerAddress), 18),
-    feeRecipientAddress: bnToFormattedString(await savingsVault.balanceOf(feeRecipientAddress), 18)
+    signer: bnToFormattedString(await savingsVault.balanceOf(signer.address), 18),
+    feeRecipient: bnToFormattedString(await savingsVault.balanceOf(parseString('FEE_RECIPIENT')), 18)
   })
 }
 

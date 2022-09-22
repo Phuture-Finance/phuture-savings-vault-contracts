@@ -28,8 +28,7 @@ async function main() {
       mainnetConfig.notional.wrappedfCashFactory,
       mainnetConfig.notional.router,
       9800,
-      admin.address,
-      10
+      admin.address
     ])
   )
   SavingsVault = SavingsVault.attach(SavingsVaultProxy.address)

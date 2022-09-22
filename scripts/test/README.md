@@ -32,3 +32,9 @@ ACCOUNT={ACCOUNT} RECEIVER={RECEIVER} SAVINGS_VAULT={SAVINGS_VAULT} AMOUNT={AMOU
 ```bash
 ACCOUNT={ACCOUNT} SAVINGS_VAULT={SAVINGS_VAULT} JOB_CONFIG={JOB_CONFIG} npx hardhat run --network local scripts/test/harvest.ts
 ```
+
+## Preview redeem
+
+```bash
+ACCOUNT={ACCOUNT} SAVINGS_VAULT={SAVINGS_VAULT} AMOUNT={AMOUNT} npx hardhat run --network local scripts/test/previewRedeem.ts
+```

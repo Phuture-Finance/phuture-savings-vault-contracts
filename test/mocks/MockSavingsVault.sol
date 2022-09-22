@@ -2,7 +2,6 @@
 pragma solidity =0.8.13;
 
 import "../../src/SavingsVault.sol";
-import "openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
 
 contract MockSavingsVault is SavingsVault {
     function _lastTransferTime() public view returns (uint96) {

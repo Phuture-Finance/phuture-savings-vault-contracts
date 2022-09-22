@@ -37,7 +37,6 @@ async function main() {
     'SavingsVault implementation',
     new SavingsVault__factory(deployer),
     {
-      gasPrice,
       gasLimit: gasLimitImpl
     }
   )
@@ -53,7 +52,6 @@ async function main() {
     feeRecipient
   ])
   await deploy.withVerification('SavingsVault proxy', new ERC1967Proxy__factory(deployer), impl.address, data, {
-    gasPrice,
     gasLimit: gasLimitProxy
   })
 }
