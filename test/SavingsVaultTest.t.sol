@@ -268,7 +268,7 @@ contract SavingsVaultTest is Test {
         SavingsVaultProxy.harvest(amount);
 
         // assert minting fee during deposit, it's initial deposit there is no AUMFee
-        assertEq(SavingsVaultProxy.balanceOf(feeRecipient), 1996007984031936127744);
+        assertEq(SavingsVaultProxy.balanceOf(feeRecipient), 0);
 
         // withdrawing half of the amount
         IWrappedfCashComplete highestYieldFCash = IWrappedfCashComplete(SavingsVaultProxy.getfCashPositions()[1]);
@@ -278,7 +278,7 @@ contract SavingsVaultTest is Test {
         SavingsVaultProxy.withdraw(amount / 2, usdcWhale, usdcWhale);
         assertEq(highestYieldFCash.balanceOf(address(SavingsVaultProxy)), 50178254919681);
         assertEq(usdc.balanceOf(address(SavingsVaultProxy)), 0);
-        assertEq(SavingsVaultProxy.balanceOf(feeRecipient), 4499137477375791733362);
+        assertEq(SavingsVaultProxy.balanceOf(feeRecipient), 317893367597104266);
 
         // withdrawing half of the remaining half
         fCashAmount = highestYieldFCash.previewWithdraw(amount / 4 - usdc.balanceOf(address(SavingsVaultProxy)));
@@ -286,19 +286,19 @@ contract SavingsVaultTest is Test {
 
         assertEq(highestYieldFCash.balanceOf(address(SavingsVaultProxy)), 25039032169466);
         assertEq(usdc.balanceOf(address(SavingsVaultProxy)), 0);
-        assertEq(SavingsVaultProxy.balanceOf(feeRecipient), 5750385759468507102121);
+        assertEq(SavingsVaultProxy.balanceOf(feeRecipient), 317893367597104266);
 
         // Redeeming the leftover amount
         SavingsVaultProxy.redeem(SavingsVaultProxy.balanceOf(usdcWhale), usdcWhale, usdcWhale);
         assertEq(SavingsVaultProxy.balanceOf(usdcWhale), 0);
-        assertEq(SavingsVaultProxy.balanceOf(feeRecipient), 6961838090250646297347);
+        assertEq(SavingsVaultProxy.balanceOf(feeRecipient), 317893367597104266);
 
         // There is some usdc and fCash amount left in the vault due to difference between oracle and instant rate.
-        assertEq(highestYieldFCash.balanceOf(address(SavingsVaultProxy)), 699362392788);
+        assertEq(highestYieldFCash.balanceOf(address(SavingsVaultProxy)), 31934556);
         assertEq(usdc.balanceOf(address(SavingsVaultProxy)), 0);
 
         // User losses certain amount of USDC due to slippage
-        assertEq(balanceBeforeDeposit - usdc.balanceOf(usdcWhale), 8387163064);
+        assertEq(balanceBeforeDeposit - usdc.balanceOf(usdcWhale), 1437425138);
     }
 
     function testWithdrawalFuzzing(uint assets) public {
@@ -420,9 +420,9 @@ contract SavingsVaultTest is Test {
         // https://eips.ethereum.org/EIPS/eip-4626#maxwithdraw => MUST return the maximum amount of assets that could be transferred from owner
         // through withdraw and not cause a revert, which MUST NOT be higher than the actual maximum that would be accepted
         // (it should underestimate if necessary).
-        assertEq(SavingsVaultProxy.balanceOf(usdcWhale), 535314264382);
+        assertEq(SavingsVaultProxy.balanceOf(usdcWhale), 0);
         assertEq(sharesBurned, shares);
-        assertEq(usdc.balanceOf(usdcWhale) - balanceOfUsdcBefore, maxAssetAmount - 56028848);
+        assertEq(usdc.balanceOf(usdcWhale) - balanceOfUsdcBefore, maxAssetAmount - 56453694);
 
         SavingsVaultProxy.redeem(SavingsVaultProxy.balanceOf(usdcWhale), usdcWhale, usdcWhale);
         assertEq(SavingsVaultProxy.balanceOf(usdcWhale), 0);
@@ -513,10 +513,10 @@ contract SavingsVaultTest is Test {
         uint sharesBalanceBefore = SavingsVaultProxy.balanceOf(usdcWhale);
         uint feeRecipientBalanceBefore = SavingsVaultProxy.balanceOf(feeRecipient);
 
-        uint fee = 250152290415505410775;
-        uint sharesBurnt = 50280610373516587565893;
+        uint fee = 0;
+        uint sharesBurnt = 50030458083101082155118;
 
-        assertEq(SavingsVaultProxy.previewRedeem(sharesBurnt), assetsToWithdraw - 26989708);
+        assertEq(SavingsVaultProxy.previewRedeem(sharesBurnt), assetsToWithdraw - 26989707);
         assertEq(SavingsVaultProxy.previewWithdraw(assetsToWithdraw), sharesBurnt);
 
         uint snapshot = vm.snapshot();
@@ -529,9 +529,9 @@ contract SavingsVaultTest is Test {
 
         vm.revertTo(snapshot);
         SavingsVaultProxy.redeem(sharesBurnt, usdcWhale, usdcWhale);
-        assertEq(SavingsVaultProxy.balanceOf(feeRecipient) - feeRecipientBalanceBefore, fee + 1);
+        assertEq(SavingsVaultProxy.balanceOf(feeRecipient) - feeRecipientBalanceBefore, fee);
         // less assets are withdrawn that estimated due to slippage
-        assertEq(usdc.balanceOf(usdcWhale) - usdcBalanceBefore, assetsToWithdraw - 26989708);
+        assertEq(usdc.balanceOf(usdcWhale) - usdcBalanceBefore, assetsToWithdraw - 26989707);
         assertEq(sharesBalanceBefore - SavingsVaultProxy.balanceOf(usdcWhale), sharesBurnt);
 
         vm.stopPrank();
@@ -544,8 +544,8 @@ contract SavingsVaultTest is Test {
         uint assetsToDeposit = 50_000 * 1e6;
         uint usdcBalanceBefore = usdc.balanceOf(usdcWhale);
 
-        uint fee = 99800399201596806387;
-        uint sharesMinted = 49900199600798403193613;
+        uint fee = 0;
+        uint sharesMinted = 50000000000000000000000;
 
         assertEq(SavingsVaultProxy.previewMint(sharesMinted), assetsToDeposit);
         assertEq(SavingsVaultProxy.previewDeposit(assetsToDeposit), sharesMinted);
@@ -606,13 +606,13 @@ contract SavingsVaultTest is Test {
         SavingsVaultProxy.redeem(SavingsVaultProxy.balanceOf(usdcWhale), usdcWhale, usdcWhale);
 
         assertEq(lowestYieldFCash.balanceOf(address(SavingsVaultProxy)), 0);
-        assertEq(highestYieldFCash.balanceOf(address(SavingsVaultProxy)), 18309011835);
+        assertEq(highestYieldFCash.balanceOf(address(SavingsVaultProxy)), 13865289);
         assertEq(SavingsVaultProxy.balanceOf(usdcWhale), 0);
         assertEq(usdc.balanceOf(address(SavingsVaultProxy)), 0);
 
         uint balanceAfterWithdrawal = usdc.balanceOf(usdcWhale);
         // User losses certain amount of USDC due to slippage
-        assertEq(balanceBeforeDeposit - balanceAfterWithdrawal, 217499375);
+        assertEq(balanceBeforeDeposit - balanceAfterWithdrawal, 36736684);
 
         vm.stopPrank();
     }
@@ -718,7 +718,7 @@ contract SavingsVaultTest is Test {
         SavingsVaultProxy.depositWithPermit(assets, signer, permit.deadline, v, r, s);
         vm.stopPrank();
 
-        assertEq(SavingsVaultProxy.balanceOf(signer), 99800399201596806388);
+        assertEq(SavingsVaultProxy.balanceOf(signer), 100e18);
     }
 
     function testStorage() public {

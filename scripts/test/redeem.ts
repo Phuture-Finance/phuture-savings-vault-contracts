@@ -6,12 +6,7 @@ import { logger } from '../utils'
 async function main() {
   const account = await impersonate(parseEthAddress('ACCOUNT'))
   const savingsVault = SavingsVault__factory.connect(parseEthAddress('SAVINGS_VAULT'), account)
-  await savingsVault['redeem(uint256,address,address,uint16)'](
-    parseBigNumber('AMOUNT', 18),
-    parseEthAddress('RECEIVER'),
-    account.address,
-    parseBigNumber('MAX_LOSS', 0)
-  )
+  await savingsVault.redeem(parseBigNumber('AMOUNT', 18), parseEthAddress('RECEIVER'), account.address)
 }
 
 main()

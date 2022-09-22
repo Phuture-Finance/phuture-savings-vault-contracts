@@ -8,7 +8,7 @@ import {
   SavingsVaultViews__factory,
   SavingsVault__factory
 } from '../../typechain-types'
-import {parseEthAddress, parseString, parseWallet} from '../../utils/parser'
+import { parseEthAddress, parseString, parseWallet } from '../../utils/parser'
 import { logger } from '../utils'
 
 function bnToFormattedString(value: BigNumber, decimals: number): string {
@@ -99,11 +99,10 @@ async function main() {
 
   const signerAddress = signer.address
   const feeRecipientAddress = parseString('FEE_RECIPIENT')
-  console.log("USV balances")
+  console.log('USV balances')
   console.table({
     signerAddress: bnToFormattedString(await savingsVault.balanceOf(signerAddress), 18),
-    feeRecipientAddress: bnToFormattedString(await savingsVault.balanceOf(feeRecipientAddress), 18),
-
+    feeRecipientAddress: bnToFormattedString(await savingsVault.balanceOf(feeRecipientAddress), 18)
   })
 }
 
