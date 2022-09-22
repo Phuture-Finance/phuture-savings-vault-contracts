@@ -95,7 +95,7 @@ contract PhutureJobTest is Test {
         vm.stopPrank();
 
         // cannot harvest if TIMEOUT
-        vm.expectRevert(bytes("PhutureJob:TIMEOUT"));
+        vm.expectRevert(bytes("PhutureJob: TIMEOUT"));
         phutureJob.harvest(address(savingsVaultProxy));
     }
 
@@ -107,7 +107,7 @@ contract PhutureJobTest is Test {
         usdc.approve(address(savingsVaultProxy), type(uint).max);
 
         // harvesting on zero reserves
-        vm.expectRevert(bytes("PhutureJob:NOTHING_TO_DEPOSIT"));
+        vm.expectRevert(bytes("PhutureJob: ZERO"));
         phutureJob.harvest(savingsVault);
         assertEq(phutureJob.lastHarvest(savingsVault), 0);
 
@@ -127,7 +127,7 @@ contract PhutureJobTest is Test {
         // harvests fails due to slippage constraint too strict
         savingsVaultProxy.setMaxLoss(9990);
         savingsVaultProxy.deposit(100_000 * 1e6, usdcWhale);
-        vm.expectRevert(bytes("PhutureJob:NOTHING_TO_DEPOSIT"));
+        vm.expectRevert(bytes("PhutureJob: ZERO"));
         phutureJob.harvest(savingsVault);
         assertEq(phutureJob.lastHarvest(savingsVault), block.timestamp);
         assertEq(usdc.balanceOf(savingsVault), 100000000067);
