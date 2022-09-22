@@ -921,6 +921,14 @@ contract SavingsVaultTest is Test {
             );
     }
 
+    function testNotional(uint shares) public {
+        vm.assume(shares < 1_000_000 * 1e8 && shares > 1 * 1e8);
+        INotionalV2 calculationViews = INotionalV2(notionalRouter);
+        address[2] memory positions = SavingsVaultProxy.getfCashPositions();
+        IWrappedfCashComplete fCash = IWrappedfCashComplete(positions[0]);
+        assertLt(fCash.previewRedeem(shares), fCash.convertToAssets(shares));
+    }
+
     // Internal helper functions for setting-up the system
 
     function getNotionalMarketParameters(uint maturity, uint oracleRate)

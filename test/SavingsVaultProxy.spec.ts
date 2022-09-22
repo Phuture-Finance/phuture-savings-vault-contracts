@@ -56,8 +56,7 @@ describe('SavingsVault interaction with wrappedFCash [ @forked-mainnet]', functi
       mainnetConfig.notional.wrappedfCashFactory,
       mainnetConfig.notional.router,
       9900,
-      randomAddress(),
-      0
+      randomAddress()
     ])
 
     savingsVaultViews = await new SavingsVaultViews__factory(signer).deploy()
