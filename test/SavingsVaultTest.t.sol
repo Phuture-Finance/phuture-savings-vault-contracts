@@ -112,7 +112,7 @@ contract SavingsVaultTest is Test {
     }
 
     function testCannotInitializeWithInvalidMaxLoss() public {
-        vm.expectRevert(bytes("SavingsVault: MAX_LOSS"));
+        vm.expectRevert(bytes("SavingsVault: INVALID"));
         new ERC1967Proxy(
             address(SavingsVaultImpl),
             abi.encodeWithSelector(
@@ -153,7 +153,7 @@ contract SavingsVaultTest is Test {
     function testCannotSetMaxLoss() public {
         uint16 invalidMaxLoss = 10_002;
         vm.prank(setupMsgSender);
-        vm.expectRevert(bytes("SavingsVault: MAX_LOSS"));
+        vm.expectRevert(bytes("SavingsVault: INVALID"));
         SavingsVaultProxy.setMaxLoss(invalidMaxLoss);
 
         vm.expectRevert(
@@ -370,7 +370,7 @@ contract SavingsVaultTest is Test {
         vm.warp(blockTimestamp + 1_000);
         uint maxShares = SavingsVaultProxy.maxRedeem(usdcWhale);
 
-        vm.expectRevert(bytes("SavingsVault: MAX_REDEEM"));
+        vm.expectRevert(bytes("SavingsVault: MAX"));
         SavingsVaultProxy.redeem(maxShares + 1, usdcWhale, usdcWhale);
 
         assertLt(maxShares, SavingsVaultProxy.convertToShares(assets));
@@ -406,7 +406,7 @@ contract SavingsVaultTest is Test {
         vm.warp(block.timestamp + 1_000);
         uint maxAssetAmount = SavingsVaultProxy.maxWithdraw(usdcWhale);
 
-        vm.expectRevert(bytes("SavingsVault: MAX_WITHDRAW"));
+        vm.expectRevert(bytes("SavingsVault: MAX"));
         SavingsVaultProxy.withdraw(maxAssetAmount + 1, usdcWhale, usdcWhale);
         assertLt(maxAssetAmount, assets);
 

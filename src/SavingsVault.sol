@@ -71,7 +71,7 @@ contract SavingsVault is
 
     /// @notice Checks if max loss is within an acceptable range
     modifier isValidMaxLoss(uint16 _maxLoss) {
-        require(_maxLoss <= BP, "SavingsVault: MAX_LOSS");
+        require(_maxLoss <= BP, "SavingsVault: INVALID");
         _;
     }
 
@@ -178,7 +178,7 @@ contract SavingsVault is
         address _receiver,
         address _owner
     ) public override returns (uint256) {
-        require(_assets <= maxWithdraw(_owner), "SavingsVault: MAX_WITHDRAW");
+        require(_assets <= maxWithdraw(_owner), "SavingsVault: MAX");
         // determine the amount of shares for the assets without the fees
         uint shares = _convertToShares(_assets, MathUpgradeable.Rounding.Up);
         // determine the burning fee on top of the estimated shares for withdrawing the exact asset output
@@ -214,7 +214,7 @@ contract SavingsVault is
         address _owner,
         uint _minOutputAmount
     ) public returns (uint256) {
-        require(_shares <= maxRedeem(_owner), "SavingsVault: MAX_REDEEM");
+        require(_shares <= maxRedeem(_owner), "SavingsVault: MAX");
         // input shares equal to _shares = sharesToBurn + sharesToBurn * burning_fee.
         // By solving the equation for sharesToBurn we can calculate the fee by subtracting sharesToBurn from the input _shares
         uint sharesToBurn = (_shares * BP) / (BP + BURNING_FEE_IN_BP);
@@ -237,7 +237,7 @@ contract SavingsVault is
 
     /// @inheritdoc ERC4626Upgradeable
     function mint(uint256 _shares, address receiver) public override returns (uint256) {
-        require(_shares <= maxMint(receiver), "SavingsVault: MAX_MINT");
+        require(_shares <= maxMint(receiver), "SavingsVault: MAX");
 
         uint256 assets = _convertToAssets(_shares, MathUpgradeable.Rounding.Up);
 
@@ -255,7 +255,7 @@ contract SavingsVault is
 
     /// @inheritdoc ERC4626Upgradeable
     function deposit(uint256 _assets, address _receiver) public override returns (uint256) {
-        require(_assets <= maxDeposit(_receiver), "SavingsVault: MAX_DEPOSIT");
+        require(_assets <= maxDeposit(_receiver), "SavingsVault: MAX");
         // calculate the shares to mint
         uint shares = convertToShares(_assets);
         uint fee = (shares * MINTING_FEE_IN_BP) / (BP + MINTING_FEE_IN_BP);
