@@ -425,6 +425,9 @@ contract SavingsVault is
                 continue;
             }
             uint totalCashAmount = fCash.convertToAssets(totalfCashAmount);
+            if (totalCashAmount == 0) {
+                continue;
+            }
             uint cashAmount = Math.min(totalCashAmount, cashToWithdraw);
             uint fCashAmount = (cashAmount * totalfCashAmount) / totalCashAmount;
             if (fCashAmount > 0) {
@@ -461,6 +464,9 @@ contract SavingsVault is
                 continue;
             }
             uint totalCashAmount = fCash.convertToAssets(totalfCashAmount);
+            if (totalCashAmount == 0) {
+                continue;
+            }
             uint cashAmount = Math.min(totalCashAmount, cashToWithdraw);
             uint fCashAmount = (cashAmount * totalfCashAmount) / totalCashAmount;
             if (fCashAmount > 0) {
