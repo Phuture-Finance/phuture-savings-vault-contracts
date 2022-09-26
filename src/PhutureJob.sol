@@ -8,13 +8,24 @@ import "openzeppelin-contracts/contracts/access/Ownable.sol";
 import "./interfaces/IKeeper3r.sol";
 import "./external/interfaces/IKeep3r.sol";
 import "./interfaces/IHarvestingJob.sol";
-import "./interfaces/IFRPHarvester.sol";
+import "./interfaces/ISavingsVaultHarvester.sol";
+import "./interfaces/IJobConfig.sol";
+import "./interfaces/IPhutureJob.sol";
 
 /// @title Phuture job
 /// @notice Contains harvesting execution logic through keeper network
-contract PhutureJob is IKeeper3r, IHarvestingJob, Pausable, Ownable {
+contract PhutureJob is IPhutureJob, IKeeper3r, IHarvestingJob, Pausable, Ownable {
     /// @inheritdoc IKeeper3r
     address public immutable override keep3r;
+
+    /// @inheritdoc IPhutureJob
+    address public override jobConfig;
+
+    /// @inheritdoc IHarvestingJob
+    mapping(address => uint96) public lastHarvest;
+
+    /// @inheritdoc IHarvestingJob
+    mapping(address => uint32) public timeout;
 
     /// @notice Pays keeper for work
     modifier payKeeper(address _keeper) {
@@ -23,8 +34,9 @@ contract PhutureJob is IKeeper3r, IHarvestingJob, Pausable, Ownable {
         IKeep3r(keep3r).worked(_keeper);
     }
 
-    constructor(address _keep3r) {
+    constructor(address _keep3r, address _jobConfig) {
         keep3r = _keep3r;
+        jobConfig = _jobConfig;
         _pause();
     }
 
@@ -38,13 +50,27 @@ contract PhutureJob is IKeeper3r, IHarvestingJob, Pausable, Ownable {
         _unpause();
     }
 
+    /// @inheritdoc IPhutureJob
+    function setJobConfig(address _jobConfig) external onlyOwner {
+        jobConfig = _jobConfig;
+    }
+
     /// @inheritdoc IHarvestingJob
-    function harvest(uint _maxDepositedAmount, IFRPHarvester _vault)
-        external
-        override
-        whenNotPaused
-        payKeeper(msg.sender)
-    {
-        _vault.harvest(_maxDepositedAmount);
+    function setTimeout(uint32 _timeout, address _savingsVault) external onlyOwner {
+        timeout[_savingsVault] = _timeout;
+    }
+
+    /// @inheritdoc IHarvestingJob
+    function harvest(address _vault) external override whenNotPaused payKeeper(msg.sender) {
+        require(canHarvest(_vault), "PhutureJob: TIMEOUT");
+        uint depositedAmount = IJobConfig(jobConfig).getDepositedAmount(address(_vault));
+        require(depositedAmount != 0, "PhutureJob: ZERO");
+        ISavingsVaultHarvester(_vault).harvest(depositedAmount);
+        lastHarvest[_vault] = uint96(block.timestamp);
+    }
+
+    /// @inheritdoc IHarvestingJob
+    function canHarvest(address _vault) public view returns (bool) {
+        return block.timestamp - lastHarvest[_vault] >= timeout[_vault];
     }
 }

@@ -8,7 +8,7 @@ import "../src/external/notional/wfCashERC4626.sol";
 import "../src/external/notional/proxy/WrappedfCashFactory.sol";
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/IERC20Upgradeable.sol";
-import "../src/FRPVault.sol";
+import "../src/SavingsVault.sol";
 
 contract WrappedfCashTest is Test {
     using stdStorage for StdStorage;
@@ -51,6 +51,29 @@ contract WrappedfCashTest is Test {
         console.log("amount underestimated is: ", withdrawAmount - netUsdcBalance); // This should return 37
         console.log("amount requested is: ", withdrawAmount);
         console.log("amount actually recieved is: ", netUsdcBalance);
+        vm.stopPrank();
+    }
+
+    function testPriceImpact() public {
+        vm.startPrank(usdcWhale);
+        mainnetHttpsUrl = vm.envString("MAINNET_HTTPS_URL");
+        mainnetFork = vm.createSelectFork(mainnetHttpsUrl, 15_596_609);
+        MarketParameters[] memory marketParameters = NotionalViews(notionalRouter).getActiveMarkets(currencyId);
+        uint maturity = marketParameters[1].maturity;
+        console.log("oracleRate is: ", marketParameters[1].oracleRate);
+        console.log("spot rate is: ", marketParameters[1].lastImpliedRate);
+        console.log("maturity is: ", marketParameters[1].maturity);
+        IWrappedfCashComplete fCash = IWrappedfCashComplete(
+            IWrappedfCashFactory(wrappedfCashFactory).deployWrapper(currencyId, uint40(maturity))
+        );
+        usdc.approve(address(fCash), type(uint).max);
+
+        uint assetsToDeposit = 264076127011;
+        uint maxLoss = 9799; // fails with 9800
+        uint minImpliedRate = marketParameters[1].oracleRate * maxLoss / 10_000;
+        uint fCashAmount = fCash.previewDeposit(assetsToDeposit);
+        fCash.mintViaUnderlying(assetsToDeposit, uint88(fCashAmount), usdcWhale, uint32(minImpliedRate));
+
         vm.stopPrank();
     }
 }

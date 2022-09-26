@@ -1,5 +1,5 @@
 {
-  "name": "@phuture/frp-contracts",
+  "name": "@phuture/savings-vault-contracts",
   "version": "0.0.1",
   "description": "The harmony between Foundry and Hardhat.",
   "directories": {
@@ -29,6 +29,7 @@
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.6",
     "@nomiclabs/hardhat-waffle": "^2.0.3",
+    "@nomiclabs/hardhat-etherscan": "^3.0.3",
     "@typechain/ethers-v5": "^10.0.0",
     "@typechain/hardhat": "^6.0.0",
     "@types/chai": "^4.3.0",
@@ -38,6 +39,7 @@
     "@typescript-eslint/parser": "^5.22.0",
     "chai": "^4.3.6",
     "cross-env": "^7.0.3",
+    "decimal.js": "^10.3.1",
     "dotenv": "^16.0.0",
     "eslint": "^8.14.0",
     "eslint-config-prettier": "^8.5.0",

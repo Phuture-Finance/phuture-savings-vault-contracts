@@ -1,14 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity =0.8.13;
 
-import "../../src/FRPVault.sol";
-import "openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
+import "../../src/SavingsVault.sol";
 
-contract MockFrpVault is FRPVault {
-    function _maxLoss() public view returns (uint16) {
-        return maxLoss;
-    }
-
+contract MockSavingsVault is SavingsVault {
     function _lastTransferTime() public view returns (uint96) {
         return lastTransferTime;
     }
@@ -23,30 +18,6 @@ contract MockFrpVault is FRPVault {
 
     function _VAULT_MANAGER_ROLE() public pure returns (bytes32) {
         return VAULT_MANAGER_ROLE;
-    }
-
-    function _HARVESTER_ROLE() public pure returns (bytes32) {
-        return HARVESTER_ROLE;
-    }
-
-    function _BP() public pure returns (uint16) {
-        return BP;
-    }
-
-    function _fCashPositions() public view returns (address[] memory) {
-        address[] memory positions = new address[](2);
-        for (uint i = 0; i < 2; i++) {
-            positions[i] = fCashPositions[i];
-        }
-        return positions;
-    }
-
-    function __sortMarketsByOracleRate()
-        public
-        view
-        returns (NotionalMarket memory lowestYieldMarket, NotionalMarket memory highestYieldMarket)
-    {
-        return _sortMarketsByOracleRate();
     }
 
     function __getThreeAndSixMonthMarkets() public view returns (NotionalMarket[] memory) {

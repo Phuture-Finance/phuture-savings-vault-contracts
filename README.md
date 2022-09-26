@@ -41,7 +41,7 @@ Whenever you install new libraries using Foundry, make sure to update your `rema
 
 ## Licensing
 
-The primary license for Phuture FRP V1 is the Business Source License 1.1 (`BUSL-1.1`), see [`LICENSE_PHUTURE`](./LICENSE_PHUTURE).
+The primary license for Phuture Savings Vault V1 is the Business Source License 1.1 (`BUSL-1.1`), see [`LICENSE_PHUTURE`](./LICENSE_PHUTURE).
 
 ### Exceptions
 
