@@ -11,5 +11,5 @@ To get SavingsVault info you need to provide:
 ### Get info
 
 ```bash
-savingsVault={SAVINGS_VAULT} savingsVaultViews={SAVINGS_VAULT_VIEWS} jobConfig={JOB_CONFIG} phutureJob={PHUTURE_JOB} npx hardhat run --network {NETWORK} ./scripts/info/savings-vault-details.ts
+savingsVault={SAVINGS_VAULT} savingsVaultViews={SAVINGS_VAULT_VIEWS} jobConfig={JOB_CONFIG} npx hardhat run --network {NETWORK} ./scripts/info/savings-vault-details.ts
 ```
