@@ -72,11 +72,14 @@ contract PhutureJobTest is Test {
         jobConfig = new JobConfig(views);
         keep3r = new Keepr3rMock();
         phutureJob = new PhutureJob(address(keep3r), address(jobConfig));
-        phutureJob.unpause();
         // Default msg.sender inside all functions is: 0x00a329c0648769a73afac7f9381e08fb43dbea72,
         // msg.sender inside setUp is 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38
         savingsVaultProxy.grantRole(keccak256("VAULT_MANAGER_ROLE"), msg.sender);
         savingsVaultProxy.grantRole(keccak256("VAULT_MANAGER_ROLE"), usdcWhale);
+        phutureJob.grantRole(keccak256("JOB_MANAGER_ROLE"), msg.sender);
+        phutureJob.grantRole(keccak256("JOB_MANAGER_ROLE"), address(0xb4c79daB8f259C7Aee6E5b2Aa729821864227e84));
+        phutureJob.grantRole(keccak256("JOB_MANAGER_ROLE"), usdcWhale);
+        phutureJob.unpause();
     }
 
     function testInitialization() public {
@@ -86,6 +89,16 @@ contract PhutureJobTest is Test {
     }
 
     function testCannotHarvest() public {
+        vm.startPrank(feeRecipient);
+        vm.expectRevert(
+            bytes(
+                "AccessControl: account 0x000000000000000000000000000000000000abcd is missing role 0x9314fad2def8e56f9df1fa7f30dc3dafd695603f8f7676a295739a12b879d2f6"
+            )
+        );
+        console.logBytes32(keccak256("JOB_MANAGER_ROLE"));
+        phutureJob.harvestWithPermission(address(savingsVaultProxy));
+        vm.stopPrank();
+
         phutureJob.setTimeout(5, address(savingsVaultProxy));
         vm.startPrank(usdcWhale);
         usdc.approve(address(savingsVaultProxy), type(uint).max);
