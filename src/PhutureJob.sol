@@ -68,7 +68,7 @@ contract PhutureJob is IPhutureJob, IKeeper3r, IHarvestingJob, Pausable, AccessC
     }
 
     /// @inheritdoc IHarvestingJob
-    function harvest(address _vault) external override payKeeper(msg.sender) {
+    function harvest(address _vault) external override whenNotPaused payKeeper(msg.sender) {
         _harvest(_vault);
     }
 
@@ -83,7 +83,7 @@ contract PhutureJob is IPhutureJob, IKeeper3r, IHarvestingJob, Pausable, AccessC
     }
 
     /// @notice Implements harvesting logic
-    function _harvest(address _vault) internal whenNotPaused {
+    function _harvest(address _vault) internal {
         require(canHarvest(_vault), "PhutureJob: TIMEOUT");
         uint depositedAmount = IJobConfig(jobConfig).getDepositedAmount(address(_vault));
         require(depositedAmount != 0, "PhutureJob: ZERO");
