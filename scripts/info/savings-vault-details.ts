@@ -1,9 +1,9 @@
-import { BigNumber } from 'ethers'
+import { BigNumber, Signer } from 'ethers'
 import {
   ERC20Upgradeable__factory,
   IWrappedfCashComplete__factory,
   JobConfig__factory,
-  PhutureJob__factory,
+  SavingsVault,
   SavingsVaultViews__factory,
   SavingsVault__factory
 } from '../../typechain-types'
@@ -11,20 +11,55 @@ import { parseEthAddress, parseString, parseWallet } from '../../utils/parser'
 import { logger } from '../utils'
 import { bnToFormattedString, timestampToFormattedTime } from '../utils/formatter'
 
+async function generateNotionalMarket(
+  fCash: string,
+  savingsVault: SavingsVault,
+  signer: Signer
+): Promise<NotionalMarket> {
+  const { lowestYieldMarket, highestYieldMarket } = await savingsVault.sortMarketsByOracleRate()
+  const fCashPosition = IWrappedfCashComplete__factory.connect(fCash, signer)
+  const maturity = BigNumber.from(await fCashPosition.getMaturity())
+  let oracleRate
+  if (await fCashPosition.hasMatured()) {
+    oracleRate = 0
+  } else if (maturity === lowestYieldMarket.maturity) {
+    oracleRate = lowestYieldMarket.oracleRate
+  } else {
+    oracleRate = highestYieldMarket.oracleRate
+  }
+  const fCashAmount: BigNumber = await fCashPosition.balanceOf(savingsVault.address)
+  return {
+    address: fCash,
+    maturity: timestampToFormattedTime(BigNumber.from(await fCashPosition.getMaturity())),
+    oracleRate: bnToFormattedString(oracleRate, 7) + '%',
+    fCashAmount: bnToFormattedString(fCashAmount, 8),
+    usdcEquivalent: bnToFormattedString(
+      fCashAmount > BigNumber.from(0) ? await fCashPosition.previewRedeem(fCashAmount) : BigNumber.from(0),
+      6
+    )
+  }
+}
+
+interface NotionalMarket {
+  address: string
+  maturity: string
+  oracleRate: string
+  fCashAmount: string
+  usdcEquivalent: string
+}
+
 async function main() {
   const signer = parseWallet('PRIVATE_KEY')
-  const { savingsVaultAddress, savingsVaultViewsAddress, jobConfigAddress, phutureJobAddress } = logger.logInputs({
+  const { savingsVaultAddress, savingsVaultViewsAddress, jobConfigAddress } = logger.logInputs({
     signer: signer.address,
     savingsVaultAddress: parseEthAddress('SAVINGS_VAULT'),
     savingsVaultViewsAddress: parseEthAddress('SAVINGS_VAULT_VIEWS'),
-    jobConfigAddress: parseEthAddress('JOB_CONFIG'),
-    phutureJobAddress: parseEthAddress('PHUTURE_JOB')
+    jobConfigAddress: parseEthAddress('JOB_CONFIG')
   })
 
-  const savingsVault = SavingsVault__factory.connect(savingsVaultAddress, signer)
+  const savingsVault: SavingsVault = SavingsVault__factory.connect(savingsVaultAddress, signer)
   const savingsVaultViews = SavingsVaultViews__factory.connect(savingsVaultViewsAddress, signer)
   const jobConfig = JobConfig__factory.connect(jobConfigAddress, signer)
-  const phutureJob = PhutureJob__factory.connect(phutureJobAddress, signer)
   const usdc = ERC20Upgradeable__factory.connect(await savingsVault.asset(), signer)
 
   const totalAssetsOraclized = await savingsVault.totalAssets()
@@ -37,11 +72,11 @@ async function main() {
   })
 
   let totalAssetsSpot = await usdc.balanceOf(savingsVaultAddress)
-  const fCashPositions = await savingsVault.getfCashPositions()
+  const fCashPositions: string[] = await savingsVault.getfCashPositions()
   for (const fCashPosition_ of fCashPositions) {
     const fCashPosition = IWrappedfCashComplete__factory.connect(fCashPosition_, signer)
     const fCashPositionBalance = await fCashPosition.balanceOf(savingsVaultAddress)
-    if (fCashPositionBalance != BigNumber.from(0)) {
+    if (fCashPositionBalance > BigNumber.from(0)) {
       totalAssetsSpot = totalAssetsSpot.add(await fCashPosition.previewRedeem(fCashPositionBalance))
     }
   }
@@ -50,32 +85,10 @@ async function main() {
     'Total Assets': bnToFormattedString(totalAssetsSpot, 6),
     'Total Supply': bnToFormattedString(totalSupply, 18)
   })
-  const lowestYieldFCash = IWrappedfCashComplete__factory.connect(fCashPositions[0], signer)
-  const highestYieldFCash = IWrappedfCashComplete__factory.connect(fCashPositions[1], signer)
-  const { lowestYieldMarket, highestYieldMarket } = await savingsVault.sortMarketsByOracleRate()
 
-  console.log('Savings Vault constituents: ')
   console.table({
-    'Lowest Yield Market Bond': {
-      address: lowestYieldFCash.address,
-      oracleRate: bnToFormattedString(lowestYieldMarket.oracleRate, 7) + '%',
-      maturity: timestampToFormattedTime(lowestYieldMarket.maturity),
-      fCashAmount: bnToFormattedString(await lowestYieldFCash.balanceOf(savingsVaultAddress), 8),
-      usdcEquivalent: bnToFormattedString(
-        await lowestYieldFCash.previewRedeem(await lowestYieldFCash.balanceOf(savingsVaultAddress)),
-        6
-      )
-    },
-    'Highest Yield Market Bond': {
-      address: highestYieldFCash.address,
-      oracleRate: bnToFormattedString(highestYieldMarket.oracleRate, 7) + '%',
-      maturity: timestampToFormattedTime(highestYieldMarket.maturity),
-      fCashAmount: bnToFormattedString(await highestYieldFCash.balanceOf(savingsVaultAddress), 8),
-      usdcEquivalent: bnToFormattedString(
-        await highestYieldFCash.previewRedeem(await highestYieldFCash.balanceOf(savingsVaultAddress)),
-        6
-      )
-    },
+    'Lowest Yield Market Bond': await generateNotionalMarket(fCashPositions[0], savingsVault, signer),
+    'Highest Yield Market Bond': await generateNotionalMarket(fCashPositions[1], savingsVault, signer),
     USDC: { usdcEquivalent: bnToFormattedString(await usdc.balanceOf(savingsVaultAddress), 6) }
   })
 
