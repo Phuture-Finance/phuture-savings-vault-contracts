@@ -30,7 +30,7 @@ async function generateNotionalMarket(
   const fCashAmount: BigNumber = await fCashPosition.balanceOf(savingsVault.address)
   return {
     address: fCash,
-    maturity: timestampToFormattedTime(BigNumber.from(await fCashPosition.getMaturity())),
+    maturity: timestampToFormattedTime(BigNumber.from(maturity)),
     oracleRate: bnToFormattedString(oracleRate, 7) + '%',
     fCashAmount: bnToFormattedString(fCashAmount, 8),
     usdcEquivalent: bnToFormattedString(
@@ -75,8 +75,8 @@ async function main() {
   const fCashPositions: string[] = await savingsVault.getfCashPositions()
   for (const fCashPosition_ of fCashPositions) {
     const fCashPosition = IWrappedfCashComplete__factory.connect(fCashPosition_, signer)
-    const fCashPositionBalance = await fCashPosition.balanceOf(savingsVaultAddress)
-    if (fCashPositionBalance > BigNumber.from(0)) {
+    const fCashPositionBalance: BigNumber = await fCashPosition.balanceOf(savingsVaultAddress)
+    if (!BigNumber.from(0).eq(fCashPositionBalance)) {
       totalAssetsSpot = totalAssetsSpot.add(await fCashPosition.previewRedeem(fCashPositionBalance))
     }
   }
