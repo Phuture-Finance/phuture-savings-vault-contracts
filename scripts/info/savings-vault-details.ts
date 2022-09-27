@@ -22,10 +22,12 @@ async function generateNotionalMarket(
   let oracleRate
   if (await fCashPosition.hasMatured()) {
     oracleRate = 0
-  } else if (maturity === lowestYieldMarket.maturity) {
+  } else if (maturity.eq(lowestYieldMarket.maturity)) {
     oracleRate = lowestYieldMarket.oracleRate
-  } else {
+  } else if(maturity.eq(highestYieldMarket.maturity)) {
     oracleRate = highestYieldMarket.oracleRate
+  } else {
+    throw Error("fCash position doesn't belong to any market")
   }
   const fCashAmount: BigNumber = await fCashPosition.balanceOf(savingsVault.address)
   return {
