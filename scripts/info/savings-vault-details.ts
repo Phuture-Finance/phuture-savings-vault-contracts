@@ -75,7 +75,7 @@ async function main() {
   const fCashPositions: string[] = await savingsVault.getfCashPositions()
   for (const fCashPosition_ of fCashPositions) {
     const fCashPosition = IWrappedfCashComplete__factory.connect(fCashPosition_, signer)
-    const fCashPositionBalance: BigNumber = await fCashPosition.balanceOf(savingsVaultAddress)
+    const fCashPositionBalance = await fCashPosition.balanceOf(savingsVaultAddress)
     if (!BigNumber.from(0).eq(fCashPositionBalance)) {
       totalAssetsSpot = totalAssetsSpot.add(await fCashPosition.previewRedeem(fCashPositionBalance))
     }
