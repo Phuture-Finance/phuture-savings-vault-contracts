@@ -4,6 +4,7 @@ pragma solidity 0.8.13;
 import "forge-std/Test.sol";
 import { MarketParameters } from "../src/external/notional/interfaces/INotional.sol";
 import "../src/external/notional/interfaces/INotionalV2.sol";
+import "../src/external/notional/interfaces/NotionalProxy.sol";
 import { IWrappedfCashComplete, IWrappedfCash } from "../src/external/notional/interfaces/IWrappedfCash.sol";
 import "../src/external/notional/proxy/WrappedfCashFactory.sol";
 import "openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
@@ -15,6 +16,7 @@ import "./mocks/MockSavingsVault.sol";
 import "./utils/SigUtils.sol";
 import "../src/SavingsVault.sol";
 import "../src/interfaces/ISavingsVault.sol";
+import "../src/PhutureJob.sol";
 
 contract SavingsVaultTest is Test {
     using stdStorage for StdStorage;
@@ -64,8 +66,7 @@ contract SavingsVaultTest is Test {
                         wrappedfCashFactory,
                         notionalRouter,
                         maxLoss,
-                        feeRecipient,
-                        1 days
+                        feeRecipient
                     )
                 )
             )
@@ -927,6 +928,102 @@ contract SavingsVaultTest is Test {
         address[2] memory positions = SavingsVaultProxy.getfCashPositions();
         IWrappedfCashComplete fCash = IWrappedfCashComplete(positions[0]);
         assertLt(fCash.previewRedeem(shares), fCash.convertToAssets(shares));
+    }
+
+    function testfCashGetsMatured() public {
+        vm.createSelectFork(mainnetHttpsUrl, 15597128);
+        SavingsVault savingsVaultImpl = new MockSavingsVault();
+        MockSavingsVault savingsVault = MockSavingsVault(
+            address(
+                new ERC1967Proxy(
+                    address(savingsVaultImpl),
+                    abi.encodeWithSelector(
+                        savingsVaultImpl.initialize.selector,
+                        name,
+                        symbol,
+                        address(usdc),
+                        currencyId,
+                        wrappedfCashFactory,
+                        notionalRouter,
+                        maxLoss,
+                        feeRecipient
+                    )
+                )
+            )
+        );
+        PhutureJob phutureJob = new PhutureJob(address(0xABCD), address(0xABCD));
+        address[2] memory positions = savingsVault.getfCashPositions();
+        assertEq(positions[0], 0x69c6B313506684f49c564B48bF0E4d41c0Cb1A3e);
+        assertEq(positions[1], 0xF1e1a4213F241d8fE23990Fc16e14eAf37a27028);
+        IWrappedfCashComplete lowestYieldfCash = IWrappedfCashComplete(positions[0]);
+        IWrappedfCashComplete highestYieldfCash = IWrappedfCashComplete(positions[1]);
+
+        uint usdcBalanceBefore = usdc.balanceOf(usdcWhale);
+
+        vm.startPrank(usdcWhale);
+        usdc.approve(address(savingsVault), type(uint256).max);
+        savingsVault.deposit(1_000 * 1e6, usdcWhale);
+        MarketParameters[] memory mockedMarkets = new MarketParameters[](2);
+        mockedMarkets[0] = getNotionalMarketParameters(lowestYieldfCash.getMaturity(), 10);
+        mockedMarkets[1] = getNotionalMarketParameters(highestYieldfCash.getMaturity(), 1);
+        vm.mockCall(
+            notionalRouter,
+            abi.encodeWithSelector(NotionalViews.getActiveMarkets.selector, currencyId),
+            abi.encode(mockedMarkets)
+        );
+        savingsVault.harvest(type(uint256).max);
+        vm.clearMockedCalls();
+
+        savingsVault.deposit(1_000 * 1e6, usdcWhale);
+        savingsVault.harvest(type(uint256).max);
+
+        // We have successfully bough both fCash positions
+        assertEq(lowestYieldfCash.balanceOf(address(savingsVault)), 100000363700);
+        assertEq(highestYieldfCash.balanceOf(address(savingsVault)), 100870069900);
+
+        // lowestYieldfCash gets matured
+        vm.warp(lowestYieldfCash.getMaturity() + 10);
+        NotionalProxy(notionalRouter).initializeMarkets(currencyId, false);
+
+        assertTrue(phutureJob.isAccountSettlementRequired(address(savingsVault)));
+
+        vm.expectRevert(bytes("Must Settle"));
+        savingsVault.totalAssets();
+
+        savingsVault.deposit(1 * 1e6, usdcWhale);
+
+        assertTrue(!phutureJob.isAccountSettlementRequired(address(savingsVault)));
+
+        uint usvShares = savingsVault.balanceOf(usdcWhale);
+        assertEq(savingsVault.decimals(), 18);
+        assertEq(usvShares, 2001011910076946795524);
+
+        // redeeming assets for usdc whale
+        uint assetsToRedeem = savingsVault.previewRedeem(savingsVault.balanceOf(usdcWhale) / 2);
+        uint assetsActualRedeemed = savingsVault.redeem(savingsVault.balanceOf(usdcWhale) / 2, usdcWhale, usdcWhale);
+        assertEq(assetsActualRedeemed, assetsToRedeem);
+        assertEq(lowestYieldfCash.balanceOf(address(savingsVault)), 83193200);
+        assertEq(highestYieldfCash.balanceOf(address(savingsVault)), 100870069900);
+        assertEq(savingsVault.balanceOf(usdcWhale), 1000505955038473397762);
+
+        savingsVault.redeem(savingsVault.balanceOf(usdcWhale), usdcWhale, usdcWhale);
+        // everything is redeemed from lowestYield fCash position
+        assertEq(lowestYieldfCash.balanceOf(address(savingsVault)), 0);
+        assertEq(highestYieldfCash.balanceOf(address(savingsVault)), 3683551);
+        assertEq(savingsVault.balanceOf(usdcWhale), 0);
+
+        uint usdcBalanceAfter = usdc.balanceOf(usdcWhale);
+        assertEq(usdcBalanceBefore - usdcBalanceAfter, 1406671);
+
+        savingsVault.deposit(100 * 1e6, usdcWhale);
+        savingsVault.harvest(type(uint256).max);
+        address[2] memory newfCashPositions = savingsVault.getfCashPositions();
+        assertEq(newfCashPositions[0], 0xF1e1a4213F241d8fE23990Fc16e14eAf37a27028);
+        assertEq(newfCashPositions[1], 0xd7e1fCeD1B09D85a5d6b5a232117F1f418e09F2F);
+        assertEq(IWrappedfCashComplete(newfCashPositions[0]).getMaturity(), 1671840000);
+        assertEq(IWrappedfCashComplete(newfCashPositions[1]).getMaturity(), 1679616000);
+
+        vm.stopPrank();
     }
 
     // Internal helper functions for setting-up the system

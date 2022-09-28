@@ -13,11 +13,6 @@ interface ISavingsVault {
         uint oracleRate;
     }
 
-    struct FCashProperties {
-        address wrappedfCash;
-        uint32 oracleRate;
-    }
-
     /// @dev Emitted when minting fCash during harvest
     /// @param _fCashPosition Address of wrappedFCash token
     /// @param _assetAmount Amount of asset spent
@@ -82,4 +77,7 @@ interface ISavingsVault {
         address _owner,
         uint _minOutputAmount
     ) external returns (uint);
+
+    /// @notice Settles any fCash positions if they have matured
+    function settleAccount() external;
 }

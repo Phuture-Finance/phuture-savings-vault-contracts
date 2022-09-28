@@ -4,6 +4,7 @@ pragma solidity 0.8.13;
 
 import "openzeppelin-contracts/contracts/security/Pausable.sol";
 import "openzeppelin-contracts/contracts/access/AccessControl.sol";
+import "openzeppelin-contracts-upgradeable/contracts/interfaces/IERC4626Upgradeable.sol";
 
 import "./interfaces/IKeeper3r.sol";
 import "./external/interfaces/IKeep3r.sol";
@@ -69,6 +70,7 @@ contract PhutureJob is IPhutureJob, IKeeper3r, IHarvestingJob, Pausable, AccessC
 
     /// @inheritdoc IHarvestingJob
     function harvest(address _vault) external override whenNotPaused payKeeper(msg.sender) {
+        require(!isAccountSettlementRequired(_vault), "PhutureJob: ACCOUNT_SETTLEMENT_REQUIRED");
         _harvest(_vault);
     }
 
@@ -78,8 +80,26 @@ contract PhutureJob is IPhutureJob, IKeeper3r, IHarvestingJob, Pausable, AccessC
     }
 
     /// @inheritdoc IHarvestingJob
+    function settleAccount(address _vault) external override whenNotPaused payKeeper(msg.sender) {
+        require(isAccountSettlementRequired(_vault), "PhutureJob: ACCOUNT_SETTLEMENT_NOT_REQUIRED");
+        ISavingsVault(_vault).settleAccount();
+    }
+
+    /// @inheritdoc IHarvestingJob
     function canHarvest(address _vault) public view returns (bool) {
         return block.timestamp - lastHarvest[_vault] >= timeout[_vault];
+    }
+
+    /// @inheritdoc IHarvestingJob
+    function isAccountSettlementRequired(address _vault) public view returns (bool) {
+        try IERC4626Upgradeable(_vault).totalAssets() returns (uint) {
+            return false;
+        } catch Error(string memory reason) {
+            if (keccak256(abi.encodePacked(reason)) == keccak256(abi.encodePacked("Must Settle"))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// @notice Implements harvesting logic

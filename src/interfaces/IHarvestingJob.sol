@@ -21,6 +21,10 @@ interface IHarvestingJob {
     /// @param _vault Address of the SavingsVault
     function harvestWithPermission(address _vault) external;
 
+    /// @notice Settles account for the vault if any of the fCash positions has matured
+    /// @param _vault Address of the SavingsVault
+    function settleAccount(address _vault) external;
+
     /// @notice Sets timeout for harvesting
     /// @param _timeout Time between two harvests
     /// @param _savingsVault Vault to set timeout for
@@ -40,4 +44,9 @@ interface IHarvestingJob {
     /// @param _vault Address of the SavingsVault
     /// @return Returns timeout for a specific vault
     function timeout(address _vault) external view returns (uint32);
+
+    /// @notice Checks if settlement is needed for any of the fCash positions
+    /// @param _vault Address of the vault
+    /// @return Returns true if a particular position has to be settled
+    function isAccountSettlementRequired(address _vault) external view returns (bool);
 }

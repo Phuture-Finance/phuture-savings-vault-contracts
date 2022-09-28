@@ -62,8 +62,7 @@ contract PhutureJobTest is Test {
                         wrappedfCashFactory,
                         notionalRouter,
                         maxLoss,
-                        feeRecipient,
-                        1 days
+                        feeRecipient
                     )
                 )
             )

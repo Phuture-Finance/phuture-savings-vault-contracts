@@ -14,6 +14,7 @@ import "openzeppelin-contracts-upgradeable/contracts/utils/math/MathUpgradeable.
 import "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 import { NotionalViews, MarketParameters } from "./external/notional/interfaces/INotional.sol";
+import "./external/notional/interfaces/INotionalV2.sol";
 import "./external/notional/lib/DateTime.sol";
 import "./external/notional/interfaces/IWrappedfCashFactory.sol";
 import { IWrappedfCashComplete } from "./external/notional/interfaces/IWrappedfCash.sol";
@@ -95,7 +96,6 @@ contract SavingsVault is
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(VAULT_ADMIN_ROLE, msg.sender);
         _setRoleAdmin(VAULT_MANAGER_ROLE, VAULT_ADMIN_ROLE);
-
         __ERC4626_init(IERC20MetadataUpgradeable(_asset));
         __ERC20_init(_name, _symbol);
         __ERC20Permit_init(_name);
@@ -179,6 +179,7 @@ contract SavingsVault is
         address _receiver,
         address _owner
     ) public override returns (uint256) {
+        settleAccount();
         require(_assets <= maxWithdraw(_owner), "SavingsVault: MAX");
         // determine the amount of shares for the assets without the fees
         uint shares = _convertToShares(_assets, MathUpgradeable.Rounding.Up);
@@ -215,6 +216,7 @@ contract SavingsVault is
         address _owner,
         uint _minOutputAmount
     ) public returns (uint256) {
+        settleAccount();
         require(_shares <= maxRedeem(_owner), "SavingsVault: MAX");
         // input shares equal to _shares = sharesToBurn + sharesToBurn * burning_fee.
         // By solving the equation for sharesToBurn we can calculate the fee by subtracting sharesToBurn from the input _shares
@@ -238,6 +240,7 @@ contract SavingsVault is
 
     /// @inheritdoc ERC4626Upgradeable
     function mint(uint256 _shares, address receiver) public override returns (uint256) {
+        settleAccount();
         require(_shares <= maxMint(receiver), "SavingsVault: MAX");
 
         uint256 assets = _convertToAssets(_shares, MathUpgradeable.Rounding.Up);
@@ -256,6 +259,7 @@ contract SavingsVault is
 
     /// @inheritdoc ERC4626Upgradeable
     function deposit(uint256 _assets, address _receiver) public override returns (uint256) {
+        settleAccount();
         require(_assets <= maxDeposit(_receiver), "SavingsVault: MAX");
         // calculate the shares to mint
         uint shares = convertToShares(_assets);
@@ -280,6 +284,16 @@ contract SavingsVault is
     ) public override returns (uint) {
         ERC20PermitUpgradeable(asset()).permit(msg.sender, address(this), _assets, _deadline, _v, _r, _s);
         return deposit(_assets, _receiver);
+    }
+
+    /// @inheritdoc ISavingsVault
+    function settleAccount() public {
+        for (uint i = 0; i < SUPPORTED_MATURITIES; i++) {
+            IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions[i]);
+            if (fCashPosition.hasMatured()) {
+                INotionalV2(notionalRouter).settleAccount(address(fCashPosition));
+            }
+        }
     }
 
     /// @inheritdoc IERC4626Upgradeable
@@ -412,14 +426,13 @@ contract SavingsVault is
         }
         // Otherwise the amount of assets to withdraw is the difference between the amount of assets in the vault and the amount of assets to withdraw from maturities
         uint totalWithdrawn = assetBalance;
-        FCashProperties[2] memory sortedfCashPositions = _sortStoredfCashPositions();
+        address[2] memory sortedfCashPositions = _sortStoredfCashPositions();
         for (uint i; i < sortedfCashPositions.length; ++i) {
             uint cashToWithdraw = _assets - totalWithdrawn;
             if (cashToWithdraw == 0) {
                 break;
             }
-            FCashProperties memory fCashPosition = sortedfCashPositions[i];
-            IWrappedfCashComplete fCash = IWrappedfCashComplete(fCashPosition.wrappedfCash);
+            IWrappedfCashComplete fCash = IWrappedfCashComplete(sortedfCashPositions[i]);
             uint totalfCashAmount = fCash.balanceOf(address(this));
             if (totalfCashAmount == 0) {
                 continue;
@@ -451,14 +464,13 @@ contract SavingsVault is
         // We track the actual amount received with previewRedeem to account for price impact/slippage
         uint totalWithdrawn = assetBalance;
         uint totalRedeemed = assetBalance;
-        FCashProperties[2] memory sortedfCashPositions = _sortStoredfCashPositions();
+        address[2] memory sortedfCashPositions = _sortStoredfCashPositions();
         for (uint i; i < sortedfCashPositions.length; ++i) {
             uint cashToWithdraw = _assets - totalWithdrawn;
             if (cashToWithdraw == 0) {
                 break;
             }
-            FCashProperties memory fCashPosition = sortedfCashPositions[i];
-            IWrappedfCashComplete fCash = IWrappedfCashComplete(fCashPosition.wrappedfCash);
+            IWrappedfCashComplete fCash = IWrappedfCashComplete(sortedfCashPositions[i]);
             uint totalfCashAmount = fCash.balanceOf(address(this));
             if (totalfCashAmount == 0) {
                 continue;
@@ -478,27 +490,19 @@ contract SavingsVault is
     }
 
     /// @notice Sorts stored fCash positions in order: matured, lowestYield, highestYield
-    function _sortStoredfCashPositions() internal view returns (FCashProperties[2] memory sorted) {
+    function _sortStoredfCashPositions() internal view returns (address[2] memory sorted) {
         address _firstfCashPosition = fCashPositions[0];
         address _secondfCashPosition = fCashPositions[1];
         // If one of the fCash positions has matured in between harvesting/withdrawal it means that the other one has rolled and became a 3 month maturity.
         // We can set max value for oracleRate for the matured fCash since it doesn't matter during redemption.
         // first position is matured redeem from it first.
         if (IWrappedfCashComplete(_firstfCashPosition).hasMatured()) {
-            sorted[0] = FCashProperties({ wrappedfCash: _firstfCashPosition, oracleRate: type(uint32).max });
-            MarketParameters memory threeMonthfCash = _getNotionalMarketParameters(_secondfCashPosition);
-            sorted[1] = FCashProperties({
-                wrappedfCash: _secondfCashPosition,
-                oracleRate: TypeConversionLibrary._safeUint32(threeMonthfCash.oracleRate)
-            });
+            sorted[0] = _firstfCashPosition;
+            sorted[1] = _secondfCashPosition;
             // second position is matured redeem from it first
         } else if (IWrappedfCashComplete(_secondfCashPosition).hasMatured()) {
-            sorted[0] = FCashProperties({ wrappedfCash: _secondfCashPosition, oracleRate: type(uint32).max });
-            MarketParameters memory threeMonthfCash = _getNotionalMarketParameters(_firstfCashPosition);
-            sorted[1] = FCashProperties({
-                wrappedfCash: _firstfCashPosition,
-                oracleRate: TypeConversionLibrary._safeUint32(threeMonthfCash.oracleRate)
-            });
+            sorted[0] = _secondfCashPosition;
+            sorted[1] = _firstfCashPosition;
             // both positions are still active, we need to fetch the oracle rates and compare it again
         } else {
             (
@@ -515,31 +519,10 @@ contract SavingsVault is
                 _currencyId,
                 uint40(highestYieldMarket.maturity)
             );
-            sorted[0] = FCashProperties({
-                wrappedfCash: lowestYieldfCash,
-                oracleRate: TypeConversionLibrary._safeUint32(lowestYieldMarket.oracleRate)
-            });
-            sorted[1] = FCashProperties({
-                wrappedfCash: highestYieldfCash,
-                oracleRate: TypeConversionLibrary._safeUint32(highestYieldMarket.oracleRate)
-            });
+            sorted[0] = lowestYieldfCash;
+            sorted[1] = highestYieldfCash;
         }
         return sorted;
-    }
-
-    /// @notice Fetches market parameters from Notional
-    /// @param _fCash to fetch market parameters
-    function _getNotionalMarketParameters(address _fCash)
-        internal
-        view
-        returns (MarketParameters memory marketParameters)
-    {
-        uint256 settlementDate = DateTime.getReferenceTime(block.timestamp) + Constants.QUARTER;
-        marketParameters = NotionalViews(notionalRouter).getMarket(
-            currencyId,
-            IWrappedfCashComplete(_fCash).getMaturity(),
-            settlementDate
-        );
     }
 
     /// @notice Gets the three and six months markets from Notional
