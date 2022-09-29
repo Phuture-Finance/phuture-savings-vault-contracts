@@ -10,7 +10,8 @@ interface IJobConfig {
     enum HarvestingSpecification {
         MAX_AMOUNT,
         MAX_DEPOSITED_AMOUNT,
-        SCALED_AMOUNT
+        SCALED_AMOUNT,
+        BINARY_SEARCH_SCALED_AMOUNT
     }
 
     /// @notice Number of steps for scaling
@@ -20,6 +21,10 @@ interface IJobConfig {
     /// @notice Percentage scaled each step in BP
     /// @return Returns percentage scaled each step in BP
     function SCALING_PERCENTAGE() external view returns (uint);
+
+    /// @notice Steps to scale with binary search
+    /// @return Returns steps to scale with binary search
+    function SCALING_STEPS_BINARY_SEARCH() external view returns (uint);
 
     /// @notice Sets harvesting amount specification
     /// @param _harvestingSpecification Enum which specifies the harvesting amount calculation method

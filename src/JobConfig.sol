@@ -16,6 +16,8 @@ contract JobConfig is IJobConfig, Ownable {
     /// @inheritdoc IJobConfig
     uint public constant SCALING_PERCENTAGE = 3000;
     /// @inheritdoc IJobConfig
+    uint public constant SCALING_STEPS_BINARY_SEARCH = 10;
+    /// @inheritdoc IJobConfig
     HarvestingSpecification public harvestingSpecification;
     /// @inheritdoc IJobConfig
     ISavingsVaultViews public savingsVaultViews;
@@ -41,12 +43,16 @@ contract JobConfig is IJobConfig, Ownable {
             return type(uint).max;
         } else if (harvestingSpecification == HarvestingSpecification.MAX_DEPOSITED_AMOUNT) {
             return savingsVaultViews.getMaxDepositedAmount(_savingsVault);
-        } else if (harvestingSpecification == HarvestingSpecification.SCALED_AMOUNT) {
+        } else {
             uint amount = savingsVaultViews.getMaxDepositedAmount(_savingsVault);
             if (amount == 0) {
                 return amount;
             }
-            return savingsVaultViews.scaleAmount(_savingsVault, amount, SCALING_PERCENTAGE, SCALING_STEPS);
+            if (harvestingSpecification == HarvestingSpecification.BINARY_SEARCH_SCALED_AMOUNT) {
+                return savingsVaultViews.scaleWithBinarySearch(_savingsVault, amount, SCALING_STEPS_BINARY_SEARCH);
+            } else if (harvestingSpecification == HarvestingSpecification.SCALED_AMOUNT) {
+                return savingsVaultViews.scaleAmount(_savingsVault, amount, SCALING_PERCENTAGE, SCALING_STEPS);
+            }
         }
         return 0;
     }

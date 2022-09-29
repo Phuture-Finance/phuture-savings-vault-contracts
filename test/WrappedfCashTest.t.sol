@@ -70,7 +70,7 @@ contract WrappedfCashTest is Test {
 
         uint assetsToDeposit = 264076127011;
         uint maxLoss = 9799; // fails with 9800
-        uint minImpliedRate = marketParameters[1].oracleRate * maxLoss / 10_000;
+        uint minImpliedRate = (marketParameters[1].oracleRate * maxLoss) / 10_000;
         uint fCashAmount = fCash.previewDeposit(assetsToDeposit);
         fCash.mintViaUnderlying(assetsToDeposit, uint88(fCashAmount), usdcWhale, uint32(minImpliedRate));
 
