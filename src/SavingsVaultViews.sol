@@ -124,7 +124,7 @@ contract SavingsVaultViews is ISavingsVaultViews {
         // Otherwise find the most optimal amount in several steps
         uint low = 0;
         uint amountToReturn = 0;
-        for (uint i = 0; i <= _steps; i++) {
+        for (uint i = 0; i < _steps; i++) {
             uint mid = (low + high) / 2;
             try
                 calculationViews.getDepositFromfCashLend(currencyId, mid, maturity, minImpliedRate, block.timestamp)
