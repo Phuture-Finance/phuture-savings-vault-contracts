@@ -96,6 +96,51 @@ contract SavingsVaultViews is ISavingsVaultViews {
     }
 
     /// @inheritdoc ISavingsVaultViews
+    function scaleWithBinarySearch(
+        address _savingsVault,
+        uint _amount,
+        uint _steps
+    ) external view returns (uint) {
+        (
+            uint maturity,
+            uint32 minImpliedRate,
+            uint16 currencyId,
+            INotionalV2 calculationViews
+        ) = getHighestYieldMarketParameters(_savingsVault);
+        (uint high, , ) = calculationViews.getfCashLendFromDeposit(
+            currencyId,
+            _amount,
+            maturity,
+            minImpliedRate,
+            block.timestamp,
+            true
+        );
+        // try with the highest amount first to see if we can harvest it. In case that is possible return that amount.
+        try
+            calculationViews.getDepositFromfCashLend(currencyId, high, maturity, minImpliedRate, block.timestamp)
+        returns (uint amountUnderlying, uint, uint8, bytes32) {
+            return amountUnderlying;
+        } catch {}
+        // Otherwise find the most optimal amount in several steps
+        uint low = 0;
+        uint amountToReturn = 0;
+        for (uint i = 0; i < _steps; i++) {
+            uint mid = (low + high) / 2;
+            try
+                calculationViews.getDepositFromfCashLend(currencyId, mid, maturity, minImpliedRate, block.timestamp)
+            returns (uint amountUnderlying, uint, uint8, bytes32) {
+                // high remains the same
+                low = mid;
+                amountToReturn = amountUnderlying;
+            } catch {
+                // low remains the same.
+                high = mid;
+            }
+        }
+        return amountToReturn;
+    }
+
+    /// @inheritdoc ISavingsVaultViews
     function getMaxDepositedAmount(address _savingsVault) public view returns (uint maxDepositedAmount) {
         maxDepositedAmount += IERC4626Upgradeable(IERC4626Upgradeable(_savingsVault).asset()).balanceOf(_savingsVault);
         address[2] memory fCashPositions = ISavingsVaultViewer(_savingsVault).getfCashPositions();

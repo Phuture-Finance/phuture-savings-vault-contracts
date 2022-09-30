@@ -4,27 +4,27 @@ pragma solidity =0.8.13;
 import "../../src/SavingsVault.sol";
 
 contract MockSavingsVault is SavingsVault {
-    function _lastTransferTime() public view returns (uint96) {
+    function _lastTransferTime() external view returns (uint96) {
         return lastTransferTime;
     }
 
-    function _feeRecipient() public view returns (address) {
+    function _feeRecipient() external view returns (address) {
         return feeRecipient;
     }
 
-    function _VAULT_ADMIN_ROLE() public pure returns (bytes32) {
+    function _VAULT_ADMIN_ROLE() external pure returns (bytes32) {
         return VAULT_ADMIN_ROLE;
     }
 
-    function _VAULT_MANAGER_ROLE() public pure returns (bytes32) {
+    function _VAULT_MANAGER_ROLE() external pure returns (bytes32) {
         return VAULT_MANAGER_ROLE;
     }
 
-    function __getThreeAndSixMonthMarkets() public view returns (NotionalMarket[] memory) {
+    function __getThreeAndSixMonthMarkets() external view returns (NotionalMarket[] memory) {
         return _getThreeAndSixMonthMarkets();
     }
 
-    function getAUMFee(uint _lastTransfer) public view returns (uint) {
+    function getAUMFee(uint _lastTransfer) external view returns (uint) {
         uint timePassed = _lastTransfer - lastTransferTime;
         if (timePassed != 0) {
             return

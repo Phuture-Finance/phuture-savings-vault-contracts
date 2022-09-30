@@ -36,6 +36,17 @@ interface ISavingsVaultViews {
         uint _steps
     ) external view returns (uint);
 
+    /// @notice Scales down the passed amount if there is price slippage.
+    /// @param _savingsVault Address of the vault
+    /// @param _amount Amount to scale down
+    /// @param _steps Steps to scaled down with binary search
+    /// @return Scaled amount
+    function scaleWithBinarySearch(
+        address _savingsVault,
+        uint _amount,
+        uint _steps
+    ) external view returns (uint);
+
     /// @notice Returns highest yiled market parameters
     /// @param _savingsVault Address of the vault
     /// @return maturity Maturity timestamp

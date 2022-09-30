@@ -45,7 +45,7 @@ contract PhutureJobTest is Test {
 
     function setUp() public {
         mainnetHttpsUrl = vm.envString("MAINNET_HTTPS_URL");
-        blockNumber = 15_272_678;
+        blockNumber = 15_637_559;
         mainnetFork = vm.createSelectFork(mainnetHttpsUrl, blockNumber);
 
         savingsVaultImpl = new MockSavingsVault();
@@ -62,8 +62,7 @@ contract PhutureJobTest is Test {
                         wrappedfCashFactory,
                         notionalRouter,
                         maxLoss,
-                        feeRecipient,
-                        1 days
+                        feeRecipient
                     )
                 )
             )
@@ -72,11 +71,14 @@ contract PhutureJobTest is Test {
         jobConfig = new JobConfig(views);
         keep3r = new Keepr3rMock();
         phutureJob = new PhutureJob(address(keep3r), address(jobConfig));
-        phutureJob.unpause();
         // Default msg.sender inside all functions is: 0x00a329c0648769a73afac7f9381e08fb43dbea72,
         // msg.sender inside setUp is 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38
         savingsVaultProxy.grantRole(keccak256("VAULT_MANAGER_ROLE"), msg.sender);
         savingsVaultProxy.grantRole(keccak256("VAULT_MANAGER_ROLE"), usdcWhale);
+        phutureJob.grantRole(keccak256("JOB_MANAGER_ROLE"), msg.sender);
+        phutureJob.grantRole(keccak256("JOB_MANAGER_ROLE"), address(0xb4c79daB8f259C7Aee6E5b2Aa729821864227e84));
+        phutureJob.grantRole(keccak256("JOB_MANAGER_ROLE"), usdcWhale);
+        phutureJob.unpause();
     }
 
     function testInitialization() public {
@@ -86,6 +88,16 @@ contract PhutureJobTest is Test {
     }
 
     function testCannotHarvest() public {
+        vm.startPrank(feeRecipient);
+        vm.expectRevert(
+            bytes(
+                "AccessControl: account 0x000000000000000000000000000000000000abcd is missing role 0x9314fad2def8e56f9df1fa7f30dc3dafd695603f8f7676a295739a12b879d2f6"
+            )
+        );
+        console.logBytes32(keccak256("JOB_MANAGER_ROLE"));
+        phutureJob.harvestWithPermission(address(savingsVaultProxy));
+        vm.stopPrank();
+
         phutureJob.setTimeout(5, address(savingsVaultProxy));
         vm.startPrank(usdcWhale);
         usdc.approve(address(savingsVaultProxy), type(uint).max);
@@ -138,6 +150,155 @@ contract PhutureJobTest is Test {
         phutureJob.harvest(savingsVault);
         assertEq(phutureJob.lastHarvest(savingsVault), block.timestamp);
         assertEq(usdc.balanceOf(savingsVault), 600080593772);
+    }
+
+    function testBinarySearchScaled() public {
+        address savingsVault = address(savingsVaultProxy);
+        phutureJob.setTimeout(0, address(savingsVaultProxy));
+        jobConfig.setHarvestingAmountSpecification(IJobConfig.HarvestingSpecification.BINARY_SEARCH_SCALED_AMOUNT);
+
+        vm.startPrank(usdcWhale);
+        usdc.approve(address(savingsVaultProxy), type(uint).max);
+
+        uint snapshot = vm.snapshot();
+
+        // harvesting on zero reserves
+        vm.expectRevert(bytes("PhutureJob: ZERO"));
+        phutureJob.harvest(savingsVault);
+        assertEq(phutureJob.lastHarvest(savingsVault), 0);
+
+        // harvests without scaling
+        savingsVaultProxy.deposit(10_000 * 1e6, usdcWhale);
+        phutureJob.harvest(savingsVault);
+        assertEq(phutureJob.lastHarvest(savingsVault), block.timestamp);
+        assertEq(usdc.balanceOf(savingsVault), 8);
+        vm.warp(block.timestamp + 10);
+
+        // harvests without scaling
+        savingsVaultProxy.deposit(100_000 * 1e6, usdcWhale);
+        phutureJob.harvest(savingsVault);
+        assertEq(phutureJob.lastHarvest(savingsVault), block.timestamp);
+        assertEq(usdc.balanceOf(savingsVault), 67);
+
+        // harvests fails due to slippage constraint too strict
+        savingsVaultProxy.setMaxLoss(9990);
+        savingsVaultProxy.deposit(100_000 * 1e6, usdcWhale);
+        vm.expectRevert(bytes("PhutureJob: ZERO"));
+        phutureJob.harvest(savingsVault);
+        assertEq(phutureJob.lastHarvest(savingsVault), block.timestamp);
+        assertEq(usdc.balanceOf(savingsVault), 100000000067);
+
+        // harvests with scaling
+        savingsVaultProxy.setMaxLoss(9500);
+        savingsVaultProxy.deposit(900_000 * 1e6, usdcWhale);
+        phutureJob.harvest(savingsVault);
+        assertEq(phutureJob.lastHarvest(savingsVault), block.timestamp);
+        assertEq(usdc.balanceOf(savingsVault), 514243970498);
+
+        uint usdcAmount = 5_000_000 * 1e6;
+
+        // harvests with scaling 1% slippage
+        vm.revertTo(snapshot);
+        savingsVaultProxy.setMaxLoss(9990);
+        savingsVaultProxy.deposit(usdcAmount, usdcWhale);
+        phutureJob.harvest(savingsVault);
+        assertEq(phutureJob.lastHarvest(savingsVault), block.timestamp);
+        uint usdcBalanceAfterHarvest = usdc.balanceOf(savingsVault);
+        assertEq(usdcBalanceAfterHarvest, 4990250292331);
+        // Amount which was actually harvested
+        assertEq(usdcAmount - usdcBalanceAfterHarvest, 9749707669); // 9k usdc
+    }
+
+    function testBinarySearchZeroPointZeroFivePercent() public {
+        address savingsVault = address(savingsVaultProxy);
+        phutureJob.setTimeout(0, address(savingsVaultProxy));
+        jobConfig.setHarvestingAmountSpecification(IJobConfig.HarvestingSpecification.BINARY_SEARCH_SCALED_AMOUNT);
+        uint usdcAmount = 5_000_000 * 1e6;
+        vm.startPrank(usdcWhale);
+        savingsVaultProxy.setMaxLoss(9995);
+        usdc.approve(address(savingsVaultProxy), type(uint).max);
+        savingsVaultProxy.deposit(usdcAmount, usdcWhale);
+        phutureJob.harvest(savingsVault);
+        uint usdcBalanceAfterHarvest = usdc.balanceOf(savingsVault);
+        assertEq(usdcBalanceAfterHarvest, 4997584033535);
+        assertEq(usdcAmount - usdcBalanceAfterHarvest, 2415966465); // 2.4k usdc pushed to Notional
+        vm.stopPrank();
+    }
+
+    function testBinarySearchZeroPointOnePercent() public {
+        address savingsVault = address(savingsVaultProxy);
+        phutureJob.setTimeout(0, address(savingsVaultProxy));
+        jobConfig.setHarvestingAmountSpecification(IJobConfig.HarvestingSpecification.BINARY_SEARCH_SCALED_AMOUNT);
+        uint usdcAmount = 5_000_000 * 1e6;
+        vm.startPrank(usdcWhale);
+        savingsVaultProxy.setMaxLoss(9990);
+        usdc.approve(address(savingsVaultProxy), type(uint).max);
+        savingsVaultProxy.deposit(usdcAmount, usdcWhale);
+        phutureJob.harvest(savingsVault);
+        uint usdcBalanceAfterHarvest = usdc.balanceOf(savingsVault);
+        assertEq(usdcBalanceAfterHarvest, 4992752034490);
+        assertEq(usdcAmount - usdcBalanceAfterHarvest, 7247965510); // 7k usdc pushed to Notional
+        vm.stopPrank();
+    }
+
+    function testBinarySearchOnePercent() public {
+        address savingsVault = address(savingsVaultProxy);
+        phutureJob.setTimeout(0, address(savingsVaultProxy));
+        jobConfig.setHarvestingAmountSpecification(IJobConfig.HarvestingSpecification.BINARY_SEARCH_SCALED_AMOUNT);
+        uint usdcAmount = 5_000_000 * 1e6;
+        vm.startPrank(usdcWhale);
+        savingsVaultProxy.setMaxLoss(9900);
+        usdc.approve(address(savingsVaultProxy), type(uint).max);
+        savingsVaultProxy.deposit(usdcAmount, usdcWhale);
+        phutureJob.harvest(savingsVault);
+        uint usdcBalanceAfterHarvest = usdc.balanceOf(savingsVault);
+        assertEq(usdcBalanceAfterHarvest, 4917844769729);
+        assertEq(usdcAmount - usdcBalanceAfterHarvest, 82155230271); // 82k usdc pushed to Notional
+        vm.stopPrank();
+    }
+
+    function testBinarySearchTwoPercent() public {
+        address savingsVault = address(savingsVaultProxy);
+        phutureJob.setTimeout(0, address(savingsVaultProxy));
+        jobConfig.setHarvestingAmountSpecification(IJobConfig.HarvestingSpecification.BINARY_SEARCH_SCALED_AMOUNT);
+        uint usdcAmount = 5_000_000 * 1e6;
+        vm.startPrank(usdcWhale);
+        savingsVaultProxy.setMaxLoss(9800);
+        usdc.approve(address(savingsVaultProxy), type(uint).max);
+        savingsVaultProxy.deposit(usdcAmount, usdcWhale);
+        phutureJob.harvest(savingsVault);
+        uint usdcBalanceAfterHarvest = usdc.balanceOf(savingsVault);
+        assertEq(usdcBalanceAfterHarvest, 4833246546902);
+        assertEq(usdcAmount - usdcBalanceAfterHarvest, 166753453098); // 166k usdc
+        vm.stopPrank();
+    }
+
+    function testBinarySearchThreePercent() public {
+        address savingsVault = address(savingsVaultProxy);
+        phutureJob.setTimeout(0, address(savingsVaultProxy));
+        jobConfig.setHarvestingAmountSpecification(IJobConfig.HarvestingSpecification.BINARY_SEARCH_SCALED_AMOUNT);
+        uint usdcAmount = 5_000_000 * 1e6;
+        vm.startPrank(usdcWhale);
+        savingsVaultProxy.setMaxLoss(9700);
+        usdc.approve(address(savingsVaultProxy), type(uint).max);
+        savingsVaultProxy.deposit(usdcAmount, usdcWhale);
+        phutureJob.harvest(savingsVault);
+        uint usdcBalanceAfterHarvest = usdc.balanceOf(savingsVault);
+        assertEq(usdcBalanceAfterHarvest, 4748621214849);
+        assertEq(usdcAmount - usdcBalanceAfterHarvest, 251378785151); // 251k usdc
+        vm.stopPrank();
+    }
+
+    function testBinarySearchThreePercentFuzzing(uint assets) public {
+        address savingsVault = address(savingsVaultProxy);
+        phutureJob.setTimeout(0, address(savingsVaultProxy));
+        jobConfig.setHarvestingAmountSpecification(IJobConfig.HarvestingSpecification.MAX_DEPOSITED_AMOUNT);
+        vm.startPrank(usdcWhale);
+        savingsVaultProxy.setMaxLoss(9700);
+        usdc.approve(address(savingsVaultProxy), type(uint).max);
+        savingsVaultProxy.deposit(253178436187, usdcWhale); // this is the maximum amount available to deposit 253K usdc
+        phutureJob.harvest(savingsVault);
+        vm.stopPrank();
     }
 
     function testSetHarvestingSpecification() public {
