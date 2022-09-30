@@ -38,3 +38,21 @@ ACCOUNT={ACCOUNT} SAVINGS_VAULT={SAVINGS_VAULT} JOB_CONFIG={JOB_CONFIG} npx hard
 ```bash
 ACCOUNT={ACCOUNT} SAVINGS_VAULT={SAVINGS_VAULT} AMOUNT={AMOUNT} npx hardhat run --network local scripts/test/previewRedeem.ts
 ```
+
+## Transfer fCash
+
+```bash
+ACCOUNT={ACCOUNT} SAVINGS_VAULT={SAVINGS_VAULT} AMOUNT={AMOUNT} npx hardhat run --network local scripts/test/transferfCash.ts
+```
+
+## Deploy TestSavingsVault
+
+```bash
+PRIVATE_KEY={PRIVATE_KEY} npx hardhat run --network local scripts/test/deployTestSavingsVault.ts
+```
+
+## Harvest to the lowest yield
+
+```bash
+ACCOUNT={ACCOUNT} SAVINGS_VAULT={SAVINGS_VAULT} JOB_CONFIG={JOB_CONFIG} TO_LOWEST_YIELD={TO_LOWEST_YIELD} npx hardhat run --network local scripts/test/harvestFromMaturity.ts
+```

@@ -114,6 +114,7 @@ contract PhutureJobTest is Test {
     function testScaledAmount() public {
         address savingsVault = address(savingsVaultProxy);
         phutureJob.setTimeout(0, address(savingsVaultProxy));
+        jobConfig.setHarvestingAmountSpecification(IJobConfig.HarvestingSpecification.SCALED_AMOUNT);
 
         vm.startPrank(usdcWhale);
         usdc.approve(address(savingsVaultProxy), type(uint).max);
@@ -130,11 +131,11 @@ contract PhutureJobTest is Test {
         assertEq(usdc.balanceOf(savingsVault), 8);
         vm.warp(block.timestamp + 10);
 
-        // harvests without scaling
+        // harvests with scaling
         savingsVaultProxy.deposit(100_000 * 1e6, usdcWhale);
         phutureJob.harvest(savingsVault);
         assertEq(phutureJob.lastHarvest(savingsVault), block.timestamp);
-        assertEq(usdc.balanceOf(savingsVault), 67);
+        assertEq(usdc.balanceOf(savingsVault), 30003968581);
 
         // harvests fails due to slippage constraint too strict
         savingsVaultProxy.setMaxLoss(9990);
@@ -142,20 +143,19 @@ contract PhutureJobTest is Test {
         vm.expectRevert(bytes("PhutureJob: ZERO"));
         phutureJob.harvest(savingsVault);
         assertEq(phutureJob.lastHarvest(savingsVault), block.timestamp);
-        assertEq(usdc.balanceOf(savingsVault), 100000000067);
+        assertEq(usdc.balanceOf(savingsVault), 130003968581);
 
         // harvests with scaling
         savingsVaultProxy.setMaxLoss(9500);
         savingsVaultProxy.deposit(900_000 * 1e6, usdcWhale);
         phutureJob.harvest(savingsVault);
         assertEq(phutureJob.lastHarvest(savingsVault), block.timestamp);
-        assertEq(usdc.balanceOf(savingsVault), 600080593772);
+        assertEq(usdc.balanceOf(savingsVault), 927185576203);
     }
 
     function testBinarySearchScaled() public {
         address savingsVault = address(savingsVaultProxy);
         phutureJob.setTimeout(0, address(savingsVaultProxy));
-        jobConfig.setHarvestingAmountSpecification(IJobConfig.HarvestingSpecification.BINARY_SEARCH_SCALED_AMOUNT);
 
         vm.startPrank(usdcWhale);
         usdc.approve(address(savingsVaultProxy), type(uint).max);
@@ -174,11 +174,11 @@ contract PhutureJobTest is Test {
         assertEq(usdc.balanceOf(savingsVault), 8);
         vm.warp(block.timestamp + 10);
 
-        // harvests without scaling
+        // harvests with scaling
         savingsVaultProxy.deposit(100_000 * 1e6, usdcWhale);
         phutureJob.harvest(savingsVault);
         assertEq(phutureJob.lastHarvest(savingsVault), block.timestamp);
-        assertEq(usdc.balanceOf(savingsVault), 67);
+        assertEq(usdc.balanceOf(savingsVault), 25540703051);
 
         // harvests fails due to slippage constraint too strict
         savingsVaultProxy.setMaxLoss(9990);
@@ -186,14 +186,14 @@ contract PhutureJobTest is Test {
         vm.expectRevert(bytes("PhutureJob: ZERO"));
         phutureJob.harvest(savingsVault);
         assertEq(phutureJob.lastHarvest(savingsVault), block.timestamp);
-        assertEq(usdc.balanceOf(savingsVault), 100000000067);
+        assertEq(usdc.balanceOf(savingsVault), 125540703051);
 
         // harvests with scaling
         savingsVaultProxy.setMaxLoss(9500);
         savingsVaultProxy.deposit(900_000 * 1e6, usdcWhale);
         phutureJob.harvest(savingsVault);
         assertEq(phutureJob.lastHarvest(savingsVault), block.timestamp);
-        assertEq(usdc.balanceOf(savingsVault), 514243970498);
+        assertEq(usdc.balanceOf(savingsVault), 688978025768);
 
         uint usdcAmount = 5_000_000 * 1e6;
 
@@ -204,9 +204,9 @@ contract PhutureJobTest is Test {
         phutureJob.harvest(savingsVault);
         assertEq(phutureJob.lastHarvest(savingsVault), block.timestamp);
         uint usdcBalanceAfterHarvest = usdc.balanceOf(savingsVault);
-        assertEq(usdcBalanceAfterHarvest, 4990250292331);
+        assertEq(usdcBalanceAfterHarvest, 4992752034490);
         // Amount which was actually harvested
-        assertEq(usdcAmount - usdcBalanceAfterHarvest, 9749707669); // 9k usdc
+        assertEq(usdcAmount - usdcBalanceAfterHarvest, 7247965510);
     }
 
     function testBinarySearchZeroPointZeroFivePercent() public {
@@ -308,7 +308,49 @@ contract PhutureJobTest is Test {
     }
 
     function testSetTimeout() public {
+        console.logBytes32(keccak256("VAULT_MANAGER_ROLE"));
         phutureJob.setTimeout(5, address(savingsVaultProxy));
         assertEq(phutureJob.timeout(address(savingsVaultProxy)), 5);
+    }
+
+    function testUpgrading() public {
+        vm.createSelectFork(mainnetHttpsUrl, 15644824);
+
+        vm.startPrank(0x56EbC6ed25ba2614A3eAAFFEfC5677efAc36F95f);
+        SavingsVault savingsVault = SavingsVault(address(0x6bAD6A9BcFdA3fd60Da6834aCe5F93B8cFed9598));
+        SavingsVault newImpl = new SavingsVault();
+        savingsVault.upgradeTo(address(0x564B7462b0BEfbc0296b1230CB5Ca8753D633F9A));
+        address[2] memory positions = savingsVault.getfCashPositions();
+        console.log("fCash 0: %s", positions[0]);
+        console.log("fCash 1: %s", positions[1]);
+        vm.stopPrank();
+
+        vm.startPrank(usdcWhale);
+        SavingsVaultViews views = SavingsVaultViews(0xE574beBdDB460e3E0588F1001D24441102339429);
+        JobConfig jobConfig = JobConfig(0x848c8b8b1490E9799Dbe4fe227545f33C0456E08);
+        Keepr3rMock keep3r = new Keepr3rMock();
+        PhutureJob phutureJob = new PhutureJob(address(keep3r), address(jobConfig));
+        phutureJob.grantRole(keccak256("JOB_MANAGER_ROLE"), usdcWhale);
+
+        usdc.approve(address(savingsVault), type(uint256).max);
+        savingsVault.deposit(1_000_000 * 1e6, usdcWhale);
+        console.log("totalAssets are: ", savingsVault.totalAssets());
+
+        vm.expectRevert(bytes("Trade failed, slippage"));
+        savingsVault.harvest(type(uint256).max);
+        console.log("scaledAmount with binary search is: ", jobConfig.getDepositedAmount(address(savingsVault)));
+        phutureJob.harvestWithPermission(address(savingsVault));
+        console.log("usdc balance after harvest is: ", usdc.balanceOf(address(savingsVault)));
+
+        positions = savingsVault.getfCashPositions();
+        console.log("fCash 0: %s", positions[0]);
+        console.log("fCash 1: %s", positions[1]);
+        console.log("highest yield fCash is: ", IWrappedfCashComplete(positions[1]).balanceOf(address(savingsVault)));
+        savingsVault.redeem(savingsVault.balanceOf(usdcWhale), usdcWhale, usdcWhale);
+        console.log("totalAssets are: ", savingsVault.totalAssets());
+        console.log(savingsVault.previewRedeem(savingsVault.balanceOf(usdcWhale)));
+        vm.expectRevert(bytes("SavingsVault: MAX"));
+        savingsVault.redeem(1, usdcWhale, usdcWhale);
+        vm.stopPrank();
     }
 }

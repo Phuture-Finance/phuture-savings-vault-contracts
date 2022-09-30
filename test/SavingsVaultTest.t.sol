@@ -844,24 +844,6 @@ contract SavingsVaultTest is Test {
 
     // Notional tests
 
-    function testGetfCashLendFromDeposit(uint32 minImpliedRate) public {
-        uint assets = 5_000_000 * 1e6;
-        vm.assume(minImpliedRate < type(uint32).max && minImpliedRate > 0);
-        INotionalV2 calculationViews = INotionalV2(notionalRouter);
-        address[2] memory positions = SavingsVaultProxy.getfCashPositions();
-        IWrappedfCashComplete fCash = IWrappedfCashComplete(positions[0]);
-        (uint fCashAmount, , ) = calculationViews.getfCashLendFromDeposit(
-            currencyId,
-            assets,
-            fCash.getMaturity(),
-            minImpliedRate,
-            block.timestamp,
-            true
-        );
-        // No price impact taken into account, always returns the same value
-        assertGt(fCashAmount + 1, assets * 100);
-    }
-
     function testFailsGetfCashLendFromDepositReverts(uint32 minImpliedRate) public {
         vm.assume(minImpliedRate < type(uint32).max && minImpliedRate > 0);
         INotionalV2 calculationViews = INotionalV2(notionalRouter);
