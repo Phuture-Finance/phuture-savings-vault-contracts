@@ -10,6 +10,7 @@ import {
 import { parseEthAddress, parseString, parseWallet } from '../../utils/parser'
 import { logger } from '../utils'
 import { bnToFormattedString, timestampToFormattedTime } from '../utils/formatter'
+import {ethers} from "hardhat";
 
 async function generateNotionalMarket(
   fCash: string,
@@ -107,6 +108,9 @@ async function main() {
     signer: bnToFormattedString(await savingsVault.balanceOf(signer.address), 18),
     feeRecipient: bnToFormattedString(await savingsVault.balanceOf(parseString('FEE_RECIPIENT')), 18)
   })
+
+  const latestBlockTimestamp = (await ethers.provider.getBlock('latest')).timestamp
+  console.log('Block timestamp: ', timestampToFormattedTime(BigNumber.from(latestBlockTimestamp)))
 }
 
 main()

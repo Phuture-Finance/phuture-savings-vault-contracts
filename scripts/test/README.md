@@ -56,3 +56,10 @@ ACCOUNT={ACCOUNT} SAVINGS_VAULT={SAVINGS_VAULT} npx hardhat run --network local 
 ```bash
 ACCOUNT={ACCOUNT} SAVINGS_VAULT={SAVINGS_VAULT} JOB_CONFIG={JOB_CONFIG} TO_LOWEST_YIELD={TO_LOWEST_YIELD} npx hardhat run --network local scripts/test/harvestFromMaturity.ts
 ```
+
+## Surpass the lowest yield maturity
+
+```bash
+ACCOUNT={ACCOUNT} SAVINGS_VAULT={SAVINGS_VAULT} npx hardhat run --network local scripts/test/surpassThreeMonthMaturity.ts
+```
+
