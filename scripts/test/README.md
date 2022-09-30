@@ -48,7 +48,7 @@ ACCOUNT={ACCOUNT} SAVINGS_VAULT={SAVINGS_VAULT} AMOUNT={AMOUNT} npx hardhat run 
 ## Deploy TestSavingsVault
 
 ```bash
-PRIVATE_KEY={PRIVATE_KEY} npx hardhat run --network local scripts/test/deployTestSavingsVault.ts
+ACCOUNT={ACCOUNT} SAVINGS_VAULT={SAVINGS_VAULT} npx hardhat run --network local scripts/test/deployTestSavingsVault.ts
 ```
 
 ## Harvest to the lowest yield
