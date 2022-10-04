@@ -1,7 +1,7 @@
-import {ERC1967Proxy__factory, SavingsVault__factory, TestSavingsVault__factory} from '../../typechain-types'
-import {parseEthAddress, parseWallet} from '../../utils/parser'
+import { SavingsVault__factory, TestSavingsVault__factory } from '../../typechain-types'
+import { impersonate } from '../../utils/evm'
+import { parseEthAddress } from '../../utils/parser'
 import { deploy, logger } from '../utils'
-import {impersonate} from "../../utils/evm";
 
 async function main() {
   logger.logTitle('Deploy TestSavingsVault')

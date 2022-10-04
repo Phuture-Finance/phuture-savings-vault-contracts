@@ -1,8 +1,10 @@
 import { BigNumber, Signer } from 'ethers'
+import { ethers } from 'hardhat'
 import {
   ERC20Upgradeable__factory,
   IWrappedfCashComplete__factory,
   JobConfig__factory,
+  NotionalViews__factory,
   SavingsVault,
   SavingsVaultViews__factory,
   SavingsVault__factory
@@ -10,23 +12,30 @@ import {
 import { parseEthAddress, parseString, parseWallet } from '../../utils/parser'
 import { logger } from '../utils'
 import { bnToFormattedString, timestampToFormattedTime } from '../utils/formatter'
-import {ethers} from "hardhat";
 
 async function generateNotionalMarket(
   fCash: string,
   savingsVault: SavingsVault,
   signer: Signer
 ): Promise<NotionalMarket> {
+  const markets = await NotionalViews__factory.connect(
+    '0x1344A36A1B56144C3Bc62E7757377D288fDE0369',
+    signer
+  ).getActiveMarkets(3)
   const { lowestYieldMarket, highestYieldMarket } = await savingsVault.sortMarketsByOracleRate()
   const fCashPosition = IWrappedfCashComplete__factory.connect(fCash, signer)
   const maturity = BigNumber.from(await fCashPosition.getMaturity())
   let oracleRate
+  let lastImpliedRate
   if (await fCashPosition.hasMatured()) {
     oracleRate = 0
+    lastImpliedRate = 0
   } else if (maturity.eq(lowestYieldMarket.maturity)) {
     oracleRate = lowestYieldMarket.oracleRate
+    lastImpliedRate = markets[0].lastImpliedRate
   } else if (maturity.eq(highestYieldMarket.maturity)) {
     oracleRate = highestYieldMarket.oracleRate
+    lastImpliedRate = markets[1].lastImpliedRate
   } else {
     throw new Error('fCash position does not belong to any market')
   }
@@ -35,6 +44,7 @@ async function generateNotionalMarket(
     address: fCash,
     maturity: timestampToFormattedTime(BigNumber.from(maturity)),
     oracleRate: bnToFormattedString(oracleRate, 7) + '%',
+    lastImpliedRate: bnToFormattedString(lastImpliedRate, 7) + '%',
     fCashAmount: bnToFormattedString(fCashAmount, 8),
     usdcEquivalent: bnToFormattedString(
       fCashAmount > BigNumber.from(0) ? await fCashPosition.previewRedeem(fCashAmount) : BigNumber.from(0),
@@ -47,6 +57,7 @@ interface NotionalMarket {
   address: string
   maturity: string
   oracleRate: string
+  lastImpliedRate: string
   fCashAmount: string
   usdcEquivalent: string
 }
@@ -110,7 +121,7 @@ async function main() {
   })
 
   const latestBlockTimestamp = (await ethers.provider.getBlock('latest')).timestamp
-  console.log('Block timestamp: ', timestampToFormattedTime(BigNumber.from(latestBlockTimestamp)))
+  console.log('Block timestamp:', timestampToFormattedTime(BigNumber.from(latestBlockTimestamp)))
 }
 
 main()
