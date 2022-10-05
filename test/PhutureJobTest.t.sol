@@ -353,4 +353,105 @@ contract PhutureJobTest is Test {
         savingsVault.redeem(1, usdcWhale, usdcWhale);
         vm.stopPrank();
     }
+
+    function testRolesSavingsVault() public {
+        vm.createSelectFork(mainnetHttpsUrl, 15680379);
+
+        address multisig = address(0x6575A93aBdFf85e5A6b97c2DB2b83bCEbc3574eC);
+        address scCorporate = address(0x56EbC6ed25ba2614A3eAAFFEfC5677efAc36F95f);
+        vm.startPrank(scCorporate);
+        SavingsVault savingsVault = SavingsVault(address(0x6bAD6A9BcFdA3fd60Da6834aCe5F93B8cFed9598));
+
+        console.logBytes32(keccak256("DEFAULT_ADMIN_ROLE"));
+        console.logBytes32(keccak256("VAULT_ADMIN_ROLE"));
+        console.logBytes32(keccak256("VAULT_MANAGER_ROLE"));
+
+        savingsVault.grantRole(0x7edcee67725a77bfa311b39349d7e96df9b23fbdbdcb328dfc17d77926920c13, multisig); // VAULT_ADMIN_ROLE
+        savingsVault.grantRole(0x0000000000000000000000000000000000000000000000000000000000000000, multisig); // DEFAULT_ADMIN_ROLE
+        savingsVault.grantRole(0xd1473398bb66596de5d1ea1fc8e303ff2ac23265adc9144b1b52065dc4f0934b, multisig);
+
+        savingsVault.revokeRole(0xd1473398bb66596de5d1ea1fc8e303ff2ac23265adc9144b1b52065dc4f0934b, scCorporate); // VAULT_MANAGER_ROLE
+        savingsVault.revokeRole(0x7edcee67725a77bfa311b39349d7e96df9b23fbdbdcb328dfc17d77926920c13, scCorporate); // VAULT_ADMIN_ROLE
+        savingsVault.revokeRole(0x0000000000000000000000000000000000000000000000000000000000000000, scCorporate);
+
+        console.log("multisig MANAGER", savingsVault.hasRole(keccak256("VAULT_MANAGER_ROLE"), multisig));
+        console.log("multisig ADMIN", savingsVault.hasRole(keccak256("VAULT_ADMIN_ROLE"), multisig));
+        console.log(
+            "multisig DEFAULT ADMIN",
+            savingsVault.hasRole(0x0000000000000000000000000000000000000000000000000000000000000000, multisig)
+        );
+
+        console.log("scCorporate MANAGER", savingsVault.hasRole(keccak256("VAULT_MANAGER_ROLE"), scCorporate));
+        console.log("scCorporate ADMIN", savingsVault.hasRole(keccak256("VAULT_ADMIN_ROLE"), scCorporate));
+        console.log(
+            "scCorporate DEFAULT ADMIN",
+            savingsVault.hasRole(0x0000000000000000000000000000000000000000000000000000000000000000, scCorporate)
+        );
+
+        console.logBytes32(savingsVault.getRoleAdmin(keccak256("VAULT_MANAGER_ROLE"))); // 0x7edcee67725a77bfa311b39349d7e96df9b23fbdbdcb328dfc17d77926920c13
+        console.logBytes32(savingsVault.getRoleAdmin(keccak256("VAULT_ADMIN_ROLE"))); // 0x0000000000000000000000000000000000000000000000000000000000000000
+        console.logBytes32(savingsVault.getRoleAdmin(keccak256("DEFAULT_ADMIN_ROLE"))); // 0x0000000000000000000000000000000000000000000000000000000000000000
+
+        vm.stopPrank();
+
+        vm.startPrank(multisig);
+        savingsVault.grantRole(keccak256("VAULT_ADMIN_ROLE"), feeRecipient);
+        vm.stopPrank();
+    }
+
+    function testRolesPhutureJob() public {
+        vm.createSelectFork(mainnetHttpsUrl, 15680379);
+
+        address multisig = address(0x6575A93aBdFf85e5A6b97c2DB2b83bCEbc3574eC);
+        address scCorporate = address(0x56EbC6ed25ba2614A3eAAFFEfC5677efAc36F95f);
+        vm.startPrank(scCorporate);
+        PhutureJob phutureJob = PhutureJob(address(0xEC771dc7Bd0aA67a10b1aF124B9b9a0DC4aF5F9B));
+
+        console.logBytes32(keccak256("JOB_ADMIN_ROLE"));
+        console.logBytes32(keccak256("JOB_MANAGER_ROLE"));
+
+        phutureJob.grantRole(0x62f07d7d1d0d6a5149a535e13640259eab4facaf14c5d017e412e9cb10de5202, multisig); // JOB_ADMIN_ROLE
+        phutureJob.grantRole(0x0000000000000000000000000000000000000000000000000000000000000000, multisig); // DEFAULT_ADMIN_ROLE
+        phutureJob.grantRole(0x9314fad2def8e56f9df1fa7f30dc3dafd695603f8f7676a295739a12b879d2f6, multisig); // JOB_MANAGER_ROLE
+
+        phutureJob.revokeRole(0x9314fad2def8e56f9df1fa7f30dc3dafd695603f8f7676a295739a12b879d2f6, scCorporate); // JOB_MANAGER_ROLE
+        phutureJob.revokeRole(0x62f07d7d1d0d6a5149a535e13640259eab4facaf14c5d017e412e9cb10de5202, scCorporate); // JOB_ADMIN_ROLE
+        phutureJob.revokeRole(0x0000000000000000000000000000000000000000000000000000000000000000, scCorporate); // DEFAULT_ADMIN_ROLE
+
+        console.log("multisig MANAGER", phutureJob.hasRole(keccak256("JOB_MANAGER_ROLE"), multisig));
+        console.log("multisig ADMIN", phutureJob.hasRole(keccak256("JOB_ADMIN_ROLE"), multisig));
+        console.log(
+            "multisig DEFAULT ADMIN",
+            phutureJob.hasRole(0x0000000000000000000000000000000000000000000000000000000000000000, multisig)
+        );
+
+        console.log("scCorporate MANAGER", phutureJob.hasRole(keccak256("JOB_MANAGER_ROLE"), scCorporate));
+        console.log("scCorporate ADMIN", phutureJob.hasRole(keccak256("JOB_ADMIN_ROLE"), scCorporate));
+        console.log(
+            "scCorporate DEFAULT ADMIN",
+            phutureJob.hasRole(0x0000000000000000000000000000000000000000000000000000000000000000, scCorporate)
+        );
+
+        console.logBytes32(phutureJob.getRoleAdmin(keccak256("JOB_MANAGER_ROLE"))); // 0x62f07d7d1d0d6a5149a535e13640259eab4facaf14c5d017e412e9cb10de5202
+        console.logBytes32(phutureJob.getRoleAdmin(keccak256("JOB_ADMIN_ROLE"))); // 0x0000000000000000000000000000000000000000000000000000000000000000
+        console.logBytes32(phutureJob.getRoleAdmin(keccak256("DEFAULT_ADMIN_ROLE"))); // 0x0000000000000000000000000000000000000000000000000000000000000000
+
+        vm.stopPrank();
+
+        vm.startPrank(multisig);
+        phutureJob.grantRole(keccak256("JOB_ADMIN_ROLE"), feeRecipient);
+        vm.stopPrank();
+    }
+
+    function testJobConfigTransferOwnership() public {
+        vm.createSelectFork(mainnetHttpsUrl, 15680379);
+
+        address multisig = address(0x6575A93aBdFf85e5A6b97c2DB2b83bCEbc3574eC);
+        address scCorporate = address(0x56EbC6ed25ba2614A3eAAFFEfC5677efAc36F95f);
+        vm.startPrank(scCorporate);
+        JobConfig jobConfig = JobConfig(address(0x848c8b8b1490E9799Dbe4fe227545f33C0456E08));
+        jobConfig.transferOwnership(multisig);
+        assertEq(jobConfig.owner(), multisig);
+        vm.stopPrank();
+    }
 }
