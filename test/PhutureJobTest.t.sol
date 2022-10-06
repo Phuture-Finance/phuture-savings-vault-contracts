@@ -292,12 +292,46 @@ contract PhutureJobTest is Test {
     function testBinarySearchThreePercentFuzzing(uint assets) public {
         address savingsVault = address(savingsVaultProxy);
         phutureJob.setTimeout(0, address(savingsVaultProxy));
-        jobConfig.setHarvestingAmountSpecification(IJobConfig.HarvestingSpecification.MAX_DEPOSITED_AMOUNT);
+        jobConfig.setHarvestingAmountSpecification(IJobConfig.HarvestingSpecification.BINARY_SEARCH_SCALED_AMOUNT);
         vm.startPrank(usdcWhale);
         savingsVaultProxy.setMaxLoss(9700);
         usdc.approve(address(savingsVaultProxy), type(uint).max);
         savingsVaultProxy.deposit(253178436187, usdcWhale); // this is the maximum amount available to deposit 253K usdc
         phutureJob.harvest(savingsVault);
+        vm.stopPrank();
+    }
+
+    function testBinarySearchMainnet() public {
+        vm.createSelectFork(mainnetHttpsUrl, 15688842);
+        PhutureJob phJob = PhutureJob(0xEC771dc7Bd0aA67a10b1aF124B9b9a0DC4aF5F9B);
+        SavingsVault vault = SavingsVault(0x6bAD6A9BcFdA3fd60Da6834aCe5F93B8cFed9598);
+        JobConfig conf = JobConfig(0x848c8b8b1490E9799Dbe4fe227545f33C0456E08);
+        SavingsVaultViews views = SavingsVaultViews(0xE574beBdDB460e3E0588F1001D24441102339429);
+        console.log(views.getMaxDepositedAmount(address(vault)));
+        console.log(usdc.balanceOf(address(vault)));
+        console.log(conf.getDepositedAmount(0x6bAD6A9BcFdA3fd60Da6834aCe5F93B8cFed9598));
+        console.log(uint(conf.harvestingSpecification()));
+        (uint maturity, uint32 minImpliedRate, uint16 currencyId, INotionalV2 calculationViews) = views
+            .getHighestYieldMarketParameters(address(vault));
+        (uint high, , ) = INotionalV2(notionalRouter).getfCashLendFromDeposit(
+            3,
+            252042537,
+            maturity,
+            minImpliedRate,
+            block.timestamp,
+            true
+        );
+        console.log("high is: ", high);
+        (uint amountUnderlying, uint a, uint8 b, bytes32 c) = INotionalV2(notionalRouter).getDepositFromfCashLend(
+            3,
+            high,
+            maturity,
+            minImpliedRate,
+            block.timestamp
+        );
+
+        vm.startPrank(0x6575A93aBdFf85e5A6b97c2DB2b83bCEbc3574eC);
+        phJob.harvestWithPermission(address(vault));
         vm.stopPrank();
     }
 

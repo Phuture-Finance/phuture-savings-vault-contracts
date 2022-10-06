@@ -32,16 +32,25 @@ contract SavingsVaultViews is ISavingsVaultViews {
         for (uint i = 0; i < 2; i++) {
             IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions[i]);
             uint fCashBalance = fCashPosition.balanceOf(address(_savingsVault));
-            if (!fCashPosition.hasMatured() && fCashBalance != 0) {
-                // settlement date is the same for 3 and 6 month markets since they both settle at the same time.
-                // 3 month market matures while 6 month market rolls to become a 3 month market.
-                MarketParameters memory marketParameters = NotionalViews(_savingsVault.notionalRouter()).getMarket(
-                    currencyId,
-                    fCashPosition.getMaturity(),
-                    DateTime.getReferenceTime(block.timestamp) + Constants.QUARTER
-                );
+            if (fCashBalance != 0) {
+                uint oracleRate;
+                if (fCashPosition.hasMatured()) {
+                    (, ISavingsVault.NotionalMarket memory highestYieldMarket) = ISavingsVaultHarvester(
+                        address(_savingsVault)
+                    ).sortMarketsByOracleRate();
+                    oracleRate = highestYieldMarket.oracleRate;
+                } else {
+                    // settlement date is the same for 3 and 6 month markets since they both settle at the same time.
+                    // 3 month market matures while 6 month market rolls to become a 3 month market.
+                    MarketParameters memory marketParameters = NotionalViews(_savingsVault.notionalRouter()).getMarket(
+                        currencyId,
+                        fCashPosition.getMaturity(),
+                        DateTime.getReferenceTime(block.timestamp) + Constants.QUARTER
+                    );
+                    oracleRate = marketParameters.oracleRate;
+                }
                 uint assets = fCashPosition.convertToAssets(fCashBalance);
-                numerator += marketParameters.oracleRate * assets;
+                numerator += oracleRate * assets;
                 denominator += assets;
             }
         }

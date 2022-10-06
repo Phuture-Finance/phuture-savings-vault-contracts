@@ -110,6 +110,7 @@ contract SavingsVaultViewsTest is Test {
         // set time to 1 day after maturity
         vm.warp(markets[0].maturity + 3600);
         NotionalProxy(notionalRouter).initializeMarkets(currencyId, false);
+        SavingsVaultProxy.deposit(1 * 1e6, usdcWhale);
 
         assertEq(views.getAPY(SavingsVaultProxy), 42173271);
     }
@@ -143,6 +144,8 @@ contract SavingsVaultViewsTest is Test {
         savingsVault.harvest(type(uint).max);
         vm.clearMockedCalls();
 
+        uint snapshot = vm.snapshot();
+
         assertEq(svViews.getAPY(savingsVault), 3626544);
 
         savingsVault.deposit(1_000 * 1e6, usdcWhale);
@@ -150,10 +153,12 @@ contract SavingsVaultViewsTest is Test {
         assertEq(usdc.balanceOf(address(savingsVault)), 0);
         assertEq(svViews.getAPY(savingsVault), 21017104);
 
+        vm.revertTo(snapshot);
         vm.warp(IWrappedfCashComplete(markets[0]).getMaturity() + 3600);
         NotionalProxy(notionalRouter).initializeMarkets(currencyId, false);
         savingsVault.deposit(1 * 1e6, usdcWhale);
-        assertEq(svViews.getAPY(savingsVault), 38611614);
+        // This is the rate from the highest yield market, we assume all matured fCash has been pushed there
+        assertEq(svViews.getAPY(savingsVault), 39181835);
 
         vm.stopPrank();
     }
