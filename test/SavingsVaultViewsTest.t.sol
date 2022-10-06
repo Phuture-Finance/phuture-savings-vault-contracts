@@ -114,11 +114,55 @@ contract SavingsVaultViewsTest is Test {
         assertEq(views.getAPY(SavingsVaultProxy), 42173271);
     }
 
+    function testAPYCloseToMaturity() public {
+        vm.stopPrank();
+        vm.createSelectFork(mainnetHttpsUrl, 15605130);
+        address scCorporate = address(0x56EbC6ed25ba2614A3eAAFFEfC5677efAc36F95f);
+        SavingsVaultViews svViews = new SavingsVaultViews();
+
+        vm.startPrank(scCorporate);
+        SavingsVault savingsVault = SavingsVault(address(0x6bAD6A9BcFdA3fd60Da6834aCe5F93B8cFed9598));
+        savingsVault.grantRole(keccak256("VAULT_MANAGER_ROLE"), scCorporate);
+
+        savingsVault.upgradeTo(address(new SavingsVault()));
+        vm.stopPrank();
+
+        vm.startPrank(usdcWhale);
+        usdc.approve(address(savingsVault), type(uint).max);
+
+        address[2] memory markets = savingsVault.getfCashPositions();
+        MarketParameters[] memory mockedMarkets = new MarketParameters[](2);
+        mockedMarkets[0] = getNotionalMarketParameters(IWrappedfCashComplete(markets[0]).getMaturity(), 100);
+        mockedMarkets[1] = getNotionalMarketParameters(IWrappedfCashComplete(markets[1]).getMaturity(), 10);
+        vm.mockCall(
+            notionalRouter,
+            abi.encodeWithSelector(NotionalViews.getActiveMarkets.selector, currencyId),
+            abi.encode(mockedMarkets)
+        );
+        savingsVault.deposit(1_000 * 1e6, usdcWhale);
+        savingsVault.harvest(type(uint).max);
+        vm.clearMockedCalls();
+
+        assertEq(svViews.getAPY(savingsVault), 3626544);
+
+        savingsVault.deposit(1_000 * 1e6, usdcWhale);
+        savingsVault.harvest(type(uint).max);
+        assertEq(usdc.balanceOf(address(savingsVault)), 0);
+        assertEq(svViews.getAPY(savingsVault), 21017104);
+
+        vm.warp(IWrappedfCashComplete(markets[0]).getMaturity() + 3600);
+        NotionalProxy(notionalRouter).initializeMarkets(currencyId, false);
+        savingsVault.deposit(1 * 1e6, usdcWhale);
+        assertEq(svViews.getAPY(savingsVault), 38611614);
+
+        vm.stopPrank();
+    }
+
     function testMaxDepositedAmount() public {
         uint amount = 100 * 1e6;
         SavingsVaultProxy.deposit(amount, usdcWhale);
-        assertEq(views.getMaxDepositedAmount(address(SavingsVaultProxy)), amount);
 
+        assertEq(views.getMaxDepositedAmount(address(SavingsVaultProxy)), amount);
         SavingsVaultProxy.harvest(type(uint).max);
         assertEq(views.getMaxDepositedAmount(address(SavingsVaultProxy)), 0);
     }
