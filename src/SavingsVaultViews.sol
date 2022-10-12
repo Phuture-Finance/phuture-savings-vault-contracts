@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.13;
 
-import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/IERC20Upgradeable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/interfaces/IERC4626Upgradeable.sol";
 
 import "./external/notional/lib/DateTime.sol";

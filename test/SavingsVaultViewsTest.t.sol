@@ -16,6 +16,7 @@ import "./mocks/MockSavingsVault.sol";
 import "openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../src/interfaces/ISavingsVault.sol";
 import "../src/SavingsVaultViews.sol";
+import "../src/interfaces/ISavingsVault.sol";
 
 contract SavingsVaultViewsTest is Test {
     using stdStorage for StdStorage;
@@ -159,6 +160,45 @@ contract SavingsVaultViewsTest is Test {
         savingsVault.deposit(1 * 1e6, usdcWhale);
         // This is the rate from the highest yield market, we assume all matured fCash has been pushed there
         assertEq(svViews.getAPY(savingsVault), 39181835);
+
+        vm.stopPrank();
+    }
+
+    function testMainnetDeploymentAPYCloseToMaturity() public {
+        vm.stopPrank();
+        vm.createSelectFork(mainnetHttpsUrl, 15732423);
+        SavingsVaultViews svViews = SavingsVaultViews(0xA04dF6ec0138B9366C28d018D16aCffd76531855);
+
+        SavingsVault savingsVault = SavingsVault(address(0x6bAD6A9BcFdA3fd60Da6834aCe5F93B8cFed9598));
+
+        vm.startPrank(usdcWhale);
+        usdc.approve(address(savingsVault), type(uint).max);
+
+        address[2] memory markets = savingsVault.getfCashPositions();
+        MarketParameters[] memory mockedMarkets = new MarketParameters[](2);
+        mockedMarkets[0] = getNotionalMarketParameters(IWrappedfCashComplete(markets[0]).getMaturity(), 100);
+        mockedMarkets[1] = getNotionalMarketParameters(IWrappedfCashComplete(markets[1]).getMaturity(), 10);
+        vm.mockCall(
+            notionalRouter,
+            abi.encodeWithSelector(NotionalViews.getActiveMarkets.selector, currencyId),
+            abi.encode(mockedMarkets)
+        );
+        savingsVault.deposit(1_000 * 1e6, usdcWhale);
+        savingsVault.harvest(type(uint).max);
+        vm.clearMockedCalls();
+
+        vm.warp(IWrappedfCashComplete(markets[0]).getMaturity() + 3600);
+        NotionalProxy(notionalRouter).initializeMarkets(currencyId, false);
+        savingsVault.deposit(1 * 1e6, usdcWhale);
+        address[2] memory maturedMarkets = savingsVault.getfCashPositions();
+        assertFalse(IWrappedfCashComplete(maturedMarkets[0]).hasMatured());
+        assertTrue(IWrappedfCashComplete(maturedMarkets[1]).hasMatured());
+        assertEq(IWrappedfCashComplete(maturedMarkets[0]).balanceOf(address(savingsVault)), 1562355611766);
+        assertEq(IWrappedfCashComplete(maturedMarkets[1]).balanceOf(address(savingsVault)), 100833088384);
+        (ISavingsVault.NotionalMarket memory lowestYieldMarket, ISavingsVault.NotionalMarket memory highestYieldMarket) = savingsVault.sortMarketsByOracleRate();
+        console.log("lowestYieldMarket", lowestYieldMarket.oracleRate, lowestYieldMarket.maturity);
+        console.log("highestYieldMarket", highestYieldMarket.oracleRate, highestYieldMarket.maturity);
+        assertEq(svViews.getAPY(savingsVault), 30956605);
 
         vm.stopPrank();
     }
