@@ -17,6 +17,7 @@ import "openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../src/interfaces/ISavingsVault.sol";
 import "../src/SavingsVaultViews.sol";
 import "../src/interfaces/ISavingsVault.sol";
+import "../src/SavingsVaultPriceViewer.sol";
 
 contract SavingsVaultViewsTest is Test {
     using stdStorage for StdStorage;
@@ -195,12 +196,22 @@ contract SavingsVaultViewsTest is Test {
         assertTrue(IWrappedfCashComplete(maturedMarkets[1]).hasMatured());
         assertEq(IWrappedfCashComplete(maturedMarkets[0]).balanceOf(address(savingsVault)), 1562355611766);
         assertEq(IWrappedfCashComplete(maturedMarkets[1]).balanceOf(address(savingsVault)), 100833088384);
-        (ISavingsVault.NotionalMarket memory lowestYieldMarket, ISavingsVault.NotionalMarket memory highestYieldMarket) = savingsVault.sortMarketsByOracleRate();
+        (
+            ISavingsVault.NotionalMarket memory lowestYieldMarket,
+            ISavingsVault.NotionalMarket memory highestYieldMarket
+        ) = savingsVault.sortMarketsByOracleRate();
         console.log("lowestYieldMarket", lowestYieldMarket.oracleRate, lowestYieldMarket.maturity);
         console.log("highestYieldMarket", highestYieldMarket.oracleRate, highestYieldMarket.maturity);
         assertEq(svViews.getAPY(savingsVault), 30956605);
 
         vm.stopPrank();
+    }
+
+    function testGetPrice() public {
+        vm.createSelectFork(mainnetHttpsUrl, 15740149);
+        SavingsVault savingsVault = SavingsVault(address(0x6bAD6A9BcFdA3fd60Da6834aCe5F93B8cFed9598));
+        SavingsVaultPriceViewer priceViewer = new SavingsVaultPriceViewer();
+        console.log(priceViewer.getPrice(address(savingsVault)));
     }
 
     function testMaxDepositedAmount() public {
