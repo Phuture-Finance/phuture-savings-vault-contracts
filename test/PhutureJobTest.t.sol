@@ -114,6 +114,7 @@ contract PhutureJobTest is Test {
     function testScaledAmount() public {
         address savingsVault = address(savingsVaultProxy);
         phutureJob.setTimeout(0, address(savingsVaultProxy));
+        jobConfig.setHarvestingAmountSpecification(IJobConfig.HarvestingSpecification.SCALED_AMOUNT);
 
         vm.startPrank(usdcWhale);
         usdc.approve(address(savingsVaultProxy), type(uint).max);
@@ -130,11 +131,11 @@ contract PhutureJobTest is Test {
         assertEq(usdc.balanceOf(savingsVault), 8);
         vm.warp(block.timestamp + 10);
 
-        // harvests without scaling
+        // harvests with scaling
         savingsVaultProxy.deposit(100_000 * 1e6, usdcWhale);
         phutureJob.harvest(savingsVault);
         assertEq(phutureJob.lastHarvest(savingsVault), block.timestamp);
-        assertEq(usdc.balanceOf(savingsVault), 67);
+        assertEq(usdc.balanceOf(savingsVault), 30003968581);
 
         // harvests fails due to slippage constraint too strict
         savingsVaultProxy.setMaxLoss(9990);
@@ -142,20 +143,19 @@ contract PhutureJobTest is Test {
         vm.expectRevert(bytes("PhutureJob: ZERO"));
         phutureJob.harvest(savingsVault);
         assertEq(phutureJob.lastHarvest(savingsVault), block.timestamp);
-        assertEq(usdc.balanceOf(savingsVault), 100000000067);
+        assertEq(usdc.balanceOf(savingsVault), 130003968581);
 
         // harvests with scaling
         savingsVaultProxy.setMaxLoss(9500);
         savingsVaultProxy.deposit(900_000 * 1e6, usdcWhale);
         phutureJob.harvest(savingsVault);
         assertEq(phutureJob.lastHarvest(savingsVault), block.timestamp);
-        assertEq(usdc.balanceOf(savingsVault), 600080593772);
+        assertEq(usdc.balanceOf(savingsVault), 927185576203);
     }
 
     function testBinarySearchScaled() public {
         address savingsVault = address(savingsVaultProxy);
         phutureJob.setTimeout(0, address(savingsVaultProxy));
-        jobConfig.setHarvestingAmountSpecification(IJobConfig.HarvestingSpecification.BINARY_SEARCH_SCALED_AMOUNT);
 
         vm.startPrank(usdcWhale);
         usdc.approve(address(savingsVaultProxy), type(uint).max);
@@ -174,11 +174,11 @@ contract PhutureJobTest is Test {
         assertEq(usdc.balanceOf(savingsVault), 8);
         vm.warp(block.timestamp + 10);
 
-        // harvests without scaling
+        // harvests with scaling
         savingsVaultProxy.deposit(100_000 * 1e6, usdcWhale);
         phutureJob.harvest(savingsVault);
         assertEq(phutureJob.lastHarvest(savingsVault), block.timestamp);
-        assertEq(usdc.balanceOf(savingsVault), 67);
+        assertEq(usdc.balanceOf(savingsVault), 25540703051);
 
         // harvests fails due to slippage constraint too strict
         savingsVaultProxy.setMaxLoss(9990);
@@ -186,14 +186,14 @@ contract PhutureJobTest is Test {
         vm.expectRevert(bytes("PhutureJob: ZERO"));
         phutureJob.harvest(savingsVault);
         assertEq(phutureJob.lastHarvest(savingsVault), block.timestamp);
-        assertEq(usdc.balanceOf(savingsVault), 100000000067);
+        assertEq(usdc.balanceOf(savingsVault), 125540703051);
 
         // harvests with scaling
         savingsVaultProxy.setMaxLoss(9500);
         savingsVaultProxy.deposit(900_000 * 1e6, usdcWhale);
         phutureJob.harvest(savingsVault);
         assertEq(phutureJob.lastHarvest(savingsVault), block.timestamp);
-        assertEq(usdc.balanceOf(savingsVault), 514243970498);
+        assertEq(usdc.balanceOf(savingsVault), 688978025768);
 
         uint usdcAmount = 5_000_000 * 1e6;
 
@@ -204,9 +204,9 @@ contract PhutureJobTest is Test {
         phutureJob.harvest(savingsVault);
         assertEq(phutureJob.lastHarvest(savingsVault), block.timestamp);
         uint usdcBalanceAfterHarvest = usdc.balanceOf(savingsVault);
-        assertEq(usdcBalanceAfterHarvest, 4990250292331);
+        assertEq(usdcBalanceAfterHarvest, 4992752034490);
         // Amount which was actually harvested
-        assertEq(usdcAmount - usdcBalanceAfterHarvest, 9749707669); // 9k usdc
+        assertEq(usdcAmount - usdcBalanceAfterHarvest, 7247965510);
     }
 
     function testBinarySearchZeroPointZeroFivePercent() public {
@@ -292,12 +292,46 @@ contract PhutureJobTest is Test {
     function testBinarySearchThreePercentFuzzing(uint assets) public {
         address savingsVault = address(savingsVaultProxy);
         phutureJob.setTimeout(0, address(savingsVaultProxy));
-        jobConfig.setHarvestingAmountSpecification(IJobConfig.HarvestingSpecification.MAX_DEPOSITED_AMOUNT);
+        jobConfig.setHarvestingAmountSpecification(IJobConfig.HarvestingSpecification.BINARY_SEARCH_SCALED_AMOUNT);
         vm.startPrank(usdcWhale);
         savingsVaultProxy.setMaxLoss(9700);
         usdc.approve(address(savingsVaultProxy), type(uint).max);
         savingsVaultProxy.deposit(253178436187, usdcWhale); // this is the maximum amount available to deposit 253K usdc
         phutureJob.harvest(savingsVault);
+        vm.stopPrank();
+    }
+
+    function testBinarySearchMainnet() public {
+        vm.createSelectFork(mainnetHttpsUrl, 15688842);
+        PhutureJob phJob = PhutureJob(0xEC771dc7Bd0aA67a10b1aF124B9b9a0DC4aF5F9B);
+        SavingsVault vault = SavingsVault(0x6bAD6A9BcFdA3fd60Da6834aCe5F93B8cFed9598);
+        JobConfig conf = JobConfig(0x848c8b8b1490E9799Dbe4fe227545f33C0456E08);
+        SavingsVaultViews views = SavingsVaultViews(0xE574beBdDB460e3E0588F1001D24441102339429);
+        console.log(views.getMaxDepositedAmount(address(vault)));
+        console.log(usdc.balanceOf(address(vault)));
+        console.log(conf.getDepositedAmount(0x6bAD6A9BcFdA3fd60Da6834aCe5F93B8cFed9598));
+        console.log(uint(conf.harvestingSpecification()));
+        (uint maturity, uint32 minImpliedRate, uint16 currencyId, INotionalV2 calculationViews) = views
+            .getHighestYieldMarketParameters(address(vault));
+        (uint high, , ) = INotionalV2(notionalRouter).getfCashLendFromDeposit(
+            3,
+            252042537,
+            maturity,
+            minImpliedRate,
+            block.timestamp,
+            true
+        );
+        console.log("high is: ", high);
+        (uint amountUnderlying, uint a, uint8 b, bytes32 c) = INotionalV2(notionalRouter).getDepositFromfCashLend(
+            3,
+            high,
+            maturity,
+            minImpliedRate,
+            block.timestamp
+        );
+
+        vm.startPrank(0x6575A93aBdFf85e5A6b97c2DB2b83bCEbc3574eC);
+        phJob.harvestWithPermission(address(vault));
         vm.stopPrank();
     }
 
@@ -308,7 +342,150 @@ contract PhutureJobTest is Test {
     }
 
     function testSetTimeout() public {
+        console.logBytes32(keccak256("VAULT_MANAGER_ROLE"));
         phutureJob.setTimeout(5, address(savingsVaultProxy));
         assertEq(phutureJob.timeout(address(savingsVaultProxy)), 5);
+    }
+
+    function testUpgrading() public {
+        vm.createSelectFork(mainnetHttpsUrl, 15644824);
+
+        vm.startPrank(0x56EbC6ed25ba2614A3eAAFFEfC5677efAc36F95f);
+        SavingsVault savingsVault = SavingsVault(address(0x6bAD6A9BcFdA3fd60Da6834aCe5F93B8cFed9598));
+        SavingsVault newImpl = new SavingsVault();
+        savingsVault.upgradeTo(address(0x564B7462b0BEfbc0296b1230CB5Ca8753D633F9A));
+        address[2] memory positions = savingsVault.getfCashPositions();
+        console.log("fCash 0: %s", positions[0]);
+        console.log("fCash 1: %s", positions[1]);
+        vm.stopPrank();
+
+        vm.startPrank(usdcWhale);
+        SavingsVaultViews views = SavingsVaultViews(0xE574beBdDB460e3E0588F1001D24441102339429);
+        JobConfig jobConfig = JobConfig(0x848c8b8b1490E9799Dbe4fe227545f33C0456E08);
+        Keepr3rMock keep3r = new Keepr3rMock();
+        PhutureJob phutureJob = new PhutureJob(address(keep3r), address(jobConfig));
+        phutureJob.grantRole(keccak256("JOB_MANAGER_ROLE"), usdcWhale);
+
+        usdc.approve(address(savingsVault), type(uint256).max);
+        savingsVault.deposit(1_000_000 * 1e6, usdcWhale);
+        console.log("totalAssets are: ", savingsVault.totalAssets());
+
+        vm.expectRevert(bytes("Trade failed, slippage"));
+        savingsVault.harvest(type(uint256).max);
+        console.log("scaledAmount with binary search is: ", jobConfig.getDepositedAmount(address(savingsVault)));
+        phutureJob.harvestWithPermission(address(savingsVault));
+        console.log("usdc balance after harvest is: ", usdc.balanceOf(address(savingsVault)));
+
+        positions = savingsVault.getfCashPositions();
+        console.log("fCash 0: %s", positions[0]);
+        console.log("fCash 1: %s", positions[1]);
+        console.log("highest yield fCash is: ", IWrappedfCashComplete(positions[1]).balanceOf(address(savingsVault)));
+        savingsVault.redeem(savingsVault.balanceOf(usdcWhale), usdcWhale, usdcWhale);
+        console.log("totalAssets are: ", savingsVault.totalAssets());
+        console.log(savingsVault.previewRedeem(savingsVault.balanceOf(usdcWhale)));
+        vm.expectRevert(bytes("SavingsVault: MAX"));
+        savingsVault.redeem(1, usdcWhale, usdcWhale);
+        vm.stopPrank();
+    }
+
+    function testRolesSavingsVault() public {
+        vm.createSelectFork(mainnetHttpsUrl, 15680379);
+
+        address multisig = address(0x6575A93aBdFf85e5A6b97c2DB2b83bCEbc3574eC);
+        address scCorporate = address(0x56EbC6ed25ba2614A3eAAFFEfC5677efAc36F95f);
+        vm.startPrank(scCorporate);
+        SavingsVault savingsVault = SavingsVault(address(0x6bAD6A9BcFdA3fd60Da6834aCe5F93B8cFed9598));
+
+        console.logBytes32(keccak256("DEFAULT_ADMIN_ROLE"));
+        console.logBytes32(keccak256("VAULT_ADMIN_ROLE"));
+        console.logBytes32(keccak256("VAULT_MANAGER_ROLE"));
+
+        savingsVault.grantRole(0x7edcee67725a77bfa311b39349d7e96df9b23fbdbdcb328dfc17d77926920c13, multisig); // VAULT_ADMIN_ROLE
+        savingsVault.grantRole(0x0000000000000000000000000000000000000000000000000000000000000000, multisig); // DEFAULT_ADMIN_ROLE
+        savingsVault.grantRole(0xd1473398bb66596de5d1ea1fc8e303ff2ac23265adc9144b1b52065dc4f0934b, multisig);
+
+        savingsVault.revokeRole(0xd1473398bb66596de5d1ea1fc8e303ff2ac23265adc9144b1b52065dc4f0934b, scCorporate); // VAULT_MANAGER_ROLE
+        savingsVault.revokeRole(0x7edcee67725a77bfa311b39349d7e96df9b23fbdbdcb328dfc17d77926920c13, scCorporate); // VAULT_ADMIN_ROLE
+        savingsVault.revokeRole(0x0000000000000000000000000000000000000000000000000000000000000000, scCorporate);
+
+        console.log("multisig MANAGER", savingsVault.hasRole(keccak256("VAULT_MANAGER_ROLE"), multisig));
+        console.log("multisig ADMIN", savingsVault.hasRole(keccak256("VAULT_ADMIN_ROLE"), multisig));
+        console.log(
+            "multisig DEFAULT ADMIN",
+            savingsVault.hasRole(0x0000000000000000000000000000000000000000000000000000000000000000, multisig)
+        );
+
+        console.log("scCorporate MANAGER", savingsVault.hasRole(keccak256("VAULT_MANAGER_ROLE"), scCorporate));
+        console.log("scCorporate ADMIN", savingsVault.hasRole(keccak256("VAULT_ADMIN_ROLE"), scCorporate));
+        console.log(
+            "scCorporate DEFAULT ADMIN",
+            savingsVault.hasRole(0x0000000000000000000000000000000000000000000000000000000000000000, scCorporate)
+        );
+
+        console.logBytes32(savingsVault.getRoleAdmin(keccak256("VAULT_MANAGER_ROLE"))); // 0x7edcee67725a77bfa311b39349d7e96df9b23fbdbdcb328dfc17d77926920c13
+        console.logBytes32(savingsVault.getRoleAdmin(keccak256("VAULT_ADMIN_ROLE"))); // 0x0000000000000000000000000000000000000000000000000000000000000000
+        console.logBytes32(savingsVault.getRoleAdmin(keccak256("DEFAULT_ADMIN_ROLE"))); // 0x0000000000000000000000000000000000000000000000000000000000000000
+
+        vm.stopPrank();
+
+        vm.startPrank(multisig);
+        savingsVault.grantRole(keccak256("VAULT_ADMIN_ROLE"), feeRecipient);
+        vm.stopPrank();
+    }
+
+    function testRolesPhutureJob() public {
+        vm.createSelectFork(mainnetHttpsUrl, 15680379);
+
+        address multisig = address(0x6575A93aBdFf85e5A6b97c2DB2b83bCEbc3574eC);
+        address scCorporate = address(0x56EbC6ed25ba2614A3eAAFFEfC5677efAc36F95f);
+        vm.startPrank(scCorporate);
+        PhutureJob phutureJob = PhutureJob(address(0xEC771dc7Bd0aA67a10b1aF124B9b9a0DC4aF5F9B));
+
+        console.logBytes32(keccak256("JOB_ADMIN_ROLE"));
+        console.logBytes32(keccak256("JOB_MANAGER_ROLE"));
+
+        phutureJob.grantRole(0x62f07d7d1d0d6a5149a535e13640259eab4facaf14c5d017e412e9cb10de5202, multisig); // JOB_ADMIN_ROLE
+        phutureJob.grantRole(0x0000000000000000000000000000000000000000000000000000000000000000, multisig); // DEFAULT_ADMIN_ROLE
+        phutureJob.grantRole(0x9314fad2def8e56f9df1fa7f30dc3dafd695603f8f7676a295739a12b879d2f6, multisig); // JOB_MANAGER_ROLE
+
+        phutureJob.revokeRole(0x9314fad2def8e56f9df1fa7f30dc3dafd695603f8f7676a295739a12b879d2f6, scCorporate); // JOB_MANAGER_ROLE
+        phutureJob.revokeRole(0x62f07d7d1d0d6a5149a535e13640259eab4facaf14c5d017e412e9cb10de5202, scCorporate); // JOB_ADMIN_ROLE
+        phutureJob.revokeRole(0x0000000000000000000000000000000000000000000000000000000000000000, scCorporate); // DEFAULT_ADMIN_ROLE
+
+        console.log("multisig MANAGER", phutureJob.hasRole(keccak256("JOB_MANAGER_ROLE"), multisig));
+        console.log("multisig ADMIN", phutureJob.hasRole(keccak256("JOB_ADMIN_ROLE"), multisig));
+        console.log(
+            "multisig DEFAULT ADMIN",
+            phutureJob.hasRole(0x0000000000000000000000000000000000000000000000000000000000000000, multisig)
+        );
+
+        console.log("scCorporate MANAGER", phutureJob.hasRole(keccak256("JOB_MANAGER_ROLE"), scCorporate));
+        console.log("scCorporate ADMIN", phutureJob.hasRole(keccak256("JOB_ADMIN_ROLE"), scCorporate));
+        console.log(
+            "scCorporate DEFAULT ADMIN",
+            phutureJob.hasRole(0x0000000000000000000000000000000000000000000000000000000000000000, scCorporate)
+        );
+
+        console.logBytes32(phutureJob.getRoleAdmin(keccak256("JOB_MANAGER_ROLE"))); // 0x62f07d7d1d0d6a5149a535e13640259eab4facaf14c5d017e412e9cb10de5202
+        console.logBytes32(phutureJob.getRoleAdmin(keccak256("JOB_ADMIN_ROLE"))); // 0x0000000000000000000000000000000000000000000000000000000000000000
+        console.logBytes32(phutureJob.getRoleAdmin(keccak256("DEFAULT_ADMIN_ROLE"))); // 0x0000000000000000000000000000000000000000000000000000000000000000
+
+        vm.stopPrank();
+
+        vm.startPrank(multisig);
+        phutureJob.grantRole(keccak256("JOB_ADMIN_ROLE"), feeRecipient);
+        vm.stopPrank();
+    }
+
+    function testJobConfigTransferOwnership() public {
+        vm.createSelectFork(mainnetHttpsUrl, 15680379);
+
+        address multisig = address(0x6575A93aBdFf85e5A6b97c2DB2b83bCEbc3574eC);
+        address scCorporate = address(0x56EbC6ed25ba2614A3eAAFFEfC5677efAc36F95f);
+        vm.startPrank(scCorporate);
+        JobConfig jobConfig = JobConfig(address(0x848c8b8b1490E9799Dbe4fe227545f33C0456E08));
+        jobConfig.transferOwnership(multisig);
+        assertEq(jobConfig.owner(), multisig);
+        vm.stopPrank();
     }
 }

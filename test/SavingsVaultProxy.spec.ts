@@ -17,7 +17,7 @@ import {
 } from '../typechain-types'
 import { impersonate, reset, setBalance, snapshot } from '../utils/evm'
 import { expandTo18Decimals, expandTo6Decimals, newProxyContract, randomAddress } from '../utils/helpers'
-import { HARVESTER_ROLE, VAULT_MANAGER_ROLE } from '../utils/roles'
+import { JOB_MANAGER_ROLE, VAULT_MANAGER_ROLE } from '../utils/roles'
 
 describe('SavingsVault interaction with wrappedFCash [ @forked-mainnet]', function () {
   this.timeout(1e8)
@@ -39,7 +39,7 @@ describe('SavingsVault interaction with wrappedFCash [ @forked-mainnet]', functi
 
     await reset({
       jsonRpcUrl: process.env.MAINNET_HTTPS_URL,
-      blockNumber: 15_272_678
+      blockNumber: 15_637_559
     })
 
     usdcWhale = await impersonate(mainnetConfig.whales.USDC)
@@ -48,7 +48,7 @@ describe('SavingsVault interaction with wrappedFCash [ @forked-mainnet]', functi
     USDC = IERC20__factory.connect(mainnetConfig.USDC, usdcWhale)
     await USDC.transfer(signer.address, expandTo6Decimals(1000))
 
-    savingsVault = await newProxyContract(new SavingsVault__factory(signer), [
+    savingsVault = await newProxyContract(new SavingsVault__factory(usdcWhale), [
       'USDC Notional Vault',
       'USDC_VAULT',
       mainnetConfig.USDC,
@@ -59,13 +59,14 @@ describe('SavingsVault interaction with wrappedFCash [ @forked-mainnet]', functi
       randomAddress()
     ])
 
-    savingsVaultViews = await new SavingsVaultViews__factory(signer).deploy()
-    jobConfig = await new JobConfig__factory(signer).deploy(savingsVaultViews.address)
+    savingsVaultViews = await new SavingsVaultViews__factory(usdcWhale).deploy()
+    jobConfig = await new JobConfig__factory(usdcWhale).deploy(savingsVaultViews.address)
+    await jobConfig.setHarvestingAmountSpecification(3)
     keep3r = await new ethers.ContractFactory(Keepr3rMock.abi, Keepr3rMock.bytecode, signer).deploy()
-    phutureJob = await new PhutureJob__factory(signer).deploy(keep3r.address, jobConfig.address)
-    await phutureJob.unpause()
-    await savingsVault.grantRole(HARVESTER_ROLE, phutureJob.address)
+    phutureJob = await new PhutureJob__factory(usdcWhale).deploy(keep3r.address, jobConfig.address)
+    await phutureJob.grantRole(JOB_MANAGER_ROLE, usdcWhale.address)
     await savingsVault.grantRole(VAULT_MANAGER_ROLE, usdcWhale.address)
+    await phutureJob.unpause()
 
     await USDC.connect(usdcWhale).approve(savingsVault.address, ethers.constants.MaxUint256)
     await USDC.connect(signer).approve(savingsVault.address, ethers.constants.MaxUint256)
@@ -86,8 +87,8 @@ describe('SavingsVault interaction with wrappedFCash [ @forked-mainnet]', functi
     // To be used with the gas reporter
     await savingsVault.connect(usdcWhale).deposit(expandTo6Decimals(1_500_000), usdcWhale.address)
 
-    await savingsVault.connect(usdcWhale).setMaxLoss(9550)
-    await phutureJob.harvest(savingsVault.address, { gasLimit: 5_000_000 })
+    // await savingsVault.connect(usdcWhale).setMaxLoss(9900)
+    await phutureJob.harvestWithPermission(savingsVault.address, { gasLimit: 5_000_000 })
   })
 
   it('deployed bytecode', async () => {

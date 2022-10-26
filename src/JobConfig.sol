@@ -24,7 +24,7 @@ contract JobConfig is IJobConfig, Ownable {
 
     constructor(ISavingsVaultViews _savingsVaultViews) {
         savingsVaultViews = _savingsVaultViews;
-        harvestingSpecification = HarvestingSpecification.SCALED_AMOUNT;
+        harvestingSpecification = HarvestingSpecification.BINARY_SEARCH_SCALED_AMOUNT;
     }
 
     /// @inheritdoc IJobConfig
