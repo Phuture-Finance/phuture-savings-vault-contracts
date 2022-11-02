@@ -1,6 +1,6 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/dist/src/signer-with-address'
 import { Contract } from 'ethers'
-import { ethers } from 'hardhat'
+import { ethers, network } from 'hardhat'
 import * as mainnetConfig from '../eth_mainnet.json'
 import * as Keepr3rMock from '../out/Keepr3rMock.sol/Keepr3rMock.json'
 import {
@@ -8,6 +8,7 @@ import {
   IERC20__factory,
   JobConfig,
   JobConfig__factory,
+  NotionalProxy__factory,
   PhutureJob,
   PhutureJob__factory,
   SavingsVault,
@@ -87,12 +88,15 @@ describe('SavingsVault interaction with wrappedFCash [ @forked-mainnet]', functi
     // To be used with the gas reporter
     await savingsVault.connect(usdcWhale).deposit(expandTo6Decimals(1_500_000), usdcWhale.address)
 
-    // await savingsVault.connect(usdcWhale).setMaxLoss(9900)
     await phutureJob.harvestWithPermission(savingsVault.address, { gasLimit: 5_000_000 })
-  })
-
-  it('deployed bytecode', async () => {
-    const bytecode = await signer.provider?.getCode(savingsVault.address)
-    console.log(bytecode)
+    await network.provider.send('evm_increaseTime', [1_671_840_010])
+    await NotionalProxy__factory.connect('0x1344A36A1B56144C3Bc62E7757377D288fDE0369', signer).initializeMarkets(
+      3,
+      false,
+      {
+        gasLimit: 10_000_000
+      }
+    )
+    console.log(await phutureJob.estimateGas.settleAccount(savingsVault.address))
   })
 })

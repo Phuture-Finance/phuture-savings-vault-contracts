@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 
+pragma solidity 0.8.13;
+
 import "openzeppelin-contracts-upgradeable/contracts/interfaces/IERC4626Upgradeable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import { IWrappedfCashComplete } from "./external/notional/interfaces/IWrappedfCash.sol";
 
 import "./interfaces/ISavingsVaultViewer.sol";
-
-pragma solidity 0.8.13;
 
 contract SavingsVaultPriceViewer {
     uint8 public constant BASE_DECIMALS = 6;

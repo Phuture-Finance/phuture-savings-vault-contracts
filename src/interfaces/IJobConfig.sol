@@ -14,18 +14,6 @@ interface IJobConfig {
         BINARY_SEARCH_SCALED_AMOUNT
     }
 
-    /// @notice Number of steps for scaling
-    /// @return Returns number of steps for scaling
-    function SCALING_STEPS() external view returns (uint);
-
-    /// @notice Percentage scaled each step in BP
-    /// @return Returns percentage scaled each step in BP
-    function SCALING_PERCENTAGE() external view returns (uint);
-
-    /// @notice Steps to scale with binary search
-    /// @return Returns steps to scale with binary search
-    function SCALING_STEPS_BINARY_SEARCH() external view returns (uint);
-
     /// @notice Sets harvesting amount specification
     /// @param _harvestingSpecification Enum which specifies the harvesting amount calculation method
     function setHarvestingAmountSpecification(HarvestingSpecification _harvestingSpecification) external;
@@ -37,6 +25,18 @@ interface IJobConfig {
     /// @notice Sets SavingsVaultViews contract
     /// @param _savingsVaultViews Address of the SavingsVaultViews
     function setSavingsVaultViews(ISavingsVaultViews _savingsVaultViews) external;
+
+    /// @notice Number of steps for scaling
+    /// @return Returns number of steps for scaling
+    function SCALING_STEPS() external view returns (uint);
+
+    /// @notice Percentage scaled each step in BP
+    /// @return Returns percentage scaled each step in BP
+    function SCALING_PERCENTAGE() external view returns (uint);
+
+    /// @notice Steps to scale with binary search
+    /// @return Returns steps to scale with binary search
+    function SCALING_STEPS_BINARY_SEARCH() external view returns (uint);
 
     /// @notice Calculates the deposited amount based on the specification
     /// @param _savingsVault Address of the SavingsVault

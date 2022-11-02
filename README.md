@@ -1,19 +1,31 @@
-# <h1> Fixed rate product </h1>
+# <h1> Savings Vault </h1>
 This repository contains the smart contracts for integration with the [Notional protocol](https://github.com/notional-finance/wrapped-fcash). 
-Fixed rate product is implemented according to the [ERC4626](https://eips.ethereum.org/EIPS/eip-4626) standard.
+Savings Vault is implemented according to the [ERC4626](https://eips.ethereum.org/EIPS/eip-4626) standard.
+
+### Environment
+> Scripts & tests depend on several environment variables to work, as well as external services for some additional functionality.
+
+#### Providing environment vars
+
+You will need to create an `.env` file in the root folder and provides values for variables according to the [`.env.example`](.env.example) file.
+
+```shell
+cp .env.example .env
+```
 
 ### Getting Started
+In case you don't have `Foundry installed make sure to follow the steps described in the following [link](https://github.com/foundry-rs/foundry).
 
  * Use Foundry: 
 ```bash
 forge install
-forge test
+forge build
 ```
 
  * Use Hardhat:
 ```bash
 npm install
-npx hardhat test
+npx hardhat compile
 ```
 
 ### Features
@@ -25,19 +37,22 @@ forge test
 npx hardhat test
 ```
 
- * Use Hardhat's task framework
-```bash
-npx hardhat example
-```
-
  * Install libraries with Foundry which work with Hardhat.
 ```bash
 forge install rari-capital/solmate # Already in this repo, just an example
+```
+### Update dependencies
+
+ * [Update libraries](https://book.getfoundry.sh/reference/forge/forge-update?highlight=forge%20update#forge-update) with Foundry:
+```bash
+forge update
 ```
 
 ### Notes
 
 Whenever you install new libraries using Foundry, make sure to update your `remappings.txt` file by running `forge remappings > remappings.txt`. This is required because we use `hardhat-preprocessor` and the `remappings.txt` file to allow Hardhat to resolve libraries you install with Foundry.
+
+The openzeppelin-contract-upgradeable library has been set to commit `54803be6` since there were some changes to how `ERC4626Upgradeable` contract handles the decimals of underlying asset in later versions. In case this library is updated, be aware that some tests are going to be failing. 
 
 ## Licensing
 

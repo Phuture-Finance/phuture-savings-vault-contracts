@@ -47,3 +47,9 @@ savingsVaultViews={SAVINGS_VAULT_VIEWS} npx hardhat run --network {NETWORK} scri
 ```shell
 keeperAddress={KEEPER} jobConfig={JOB_CONFIG} npx hardhat run --network {NETWORK} scripts/deploy/004-phuture-job.deploy.ts 
 ```
+
+### 5. Deploy SavinsgVaultPriceViewer
+
+```shell
+npx hardhat run --network {NETWORK} scripts/deploy/005-savings-vault-price-viewer.deploy.ts 
+```
