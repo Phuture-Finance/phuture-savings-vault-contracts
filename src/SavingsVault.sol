@@ -50,7 +50,7 @@ contract SavingsVault is
     /// @inheritdoc ISavingsVaultViewer
     uint16 public constant BP = 10_000;
     /// @inheritdoc ISavingsVaultViewer
-    uint public constant AUM_SCALED_PER_SECONDS_RATE = 1000000000158946658547141217;
+    uint public constant AUM_SCALED_PER_SECONDS_RATE = 1000000000000000000000000000;
     /// @inheritdoc ISavingsVaultViewer
     uint public constant MINTING_FEE_IN_BP = 0;
     /// @inheritdoc ISavingsVaultViewer
