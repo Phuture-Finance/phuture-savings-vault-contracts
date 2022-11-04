@@ -63,4 +63,6 @@ The primary license for Phuture Savings Vault V1 is the Business Source License 
 - Files in `src/interfaces/` are licensed under `GPL-2.0-or-later` (as indicated in their SPDX headers), see [`src/interfaces/LICENSE_GPL`](./src/interfaces/LICENSE_GPL)
 - Files in `src/libraries/` are licensed under `GPL-2.0-or-later` (as indicated in their SPDX headers), see [`src/libraries/LICENSE_GPL`](src/libraries/LICENSE_GPL)
 - Files in `src/external/` are licensed under `MIT` (as indicated in their SPDX headers), see [`src/external/LICENSE_MIT`](src/external/LICENSE_MIT)
-- All files in `test` remain unlicensed.
+- Several files in `src/external/notional/interfaces` are licensed under `AGPL-3.0-only` (as indicated in their SPDX headers), see [`src/external/notional/interfaces/LICENSE_AGPL`](src/external/notional/interfaces/LICENSE_AGPL)
+- Several files in `src/external/notional/interfaces` are licensed under `GPL-3.0-only` (as indicated in their SPDX headers), see [`src/external/notional/interfaces/LICENSE_GPL`](src/external/notional/interfaces/LICENSE_GPL)
+- All files in `test` and `src/test` remain unlicensed.
