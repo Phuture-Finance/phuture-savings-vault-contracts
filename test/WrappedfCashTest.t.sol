@@ -2,8 +2,13 @@
 pragma solidity 0.8.13;
 
 import "forge-std/Test.sol";
-import { MarketParameters, AssetRateAdapter, NotionalGovernance, NotionalViews } from "../src/external/notional/interfaces/INotional.sol";
-import { IWrappedfCashComplete, IWrappedfCash } from "../src/external/notional/interfaces/IWrappedfCash.sol";
+import {
+    MarketParameters,
+    AssetRateAdapter,
+    NotionalGovernance,
+    NotionalViews
+} from "../src/external/notional/interfaces/INotional.sol";
+import {IWrappedfCashComplete, IWrappedfCash} from "../src/external/notional/interfaces/IWrappedfCash.sol";
 import "../src/external/notional/wfCashERC4626.sol";
 import "../src/external/notional/proxy/WrappedfCashFactory.sol";
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
@@ -32,9 +37,8 @@ contract WrappedfCashTest is Test {
         uint maturity = marketParameters[0].maturity;
         console.log("oracleRate is: ", marketParameters[0].oracleRate);
         console.log("spot rate is: ", marketParameters[0].lastImpliedRate);
-        IWrappedfCashComplete fCash = IWrappedfCashComplete(
-            IWrappedfCashFactory(wrappedfCashFactory).deployWrapper(currencyId, uint40(maturity))
-        );
+        IWrappedfCashComplete fCash =
+            IWrappedfCashComplete(IWrappedfCashFactory(wrappedfCashFactory).deployWrapper(currencyId, uint40(maturity)));
         usdc.approve(address(fCash), type(uint).max);
 
         uint assetsToDeposit = 100_000 * 1e6;
@@ -63,9 +67,8 @@ contract WrappedfCashTest is Test {
         console.log("oracleRate is: ", marketParameters[1].oracleRate);
         console.log("spot rate is: ", marketParameters[1].lastImpliedRate);
         console.log("maturity is: ", marketParameters[1].maturity);
-        IWrappedfCashComplete fCash = IWrappedfCashComplete(
-            IWrappedfCashFactory(wrappedfCashFactory).deployWrapper(currencyId, uint40(maturity))
-        );
+        IWrappedfCashComplete fCash =
+            IWrappedfCashComplete(IWrappedfCashFactory(wrappedfCashFactory).deployWrapper(currencyId, uint40(maturity)));
         usdc.approve(address(fCash), type(uint).max);
 
         uint assetsToDeposit = 264076127011;
@@ -74,6 +77,64 @@ contract WrappedfCashTest is Test {
         uint fCashAmount = fCash.previewDeposit(assetsToDeposit);
         fCash.mintViaUnderlying(assetsToDeposit, uint88(fCashAmount), usdcWhale, uint32(minImpliedRate));
 
+        vm.stopPrank();
+    }
+
+    function testDifferentMaturities() public {
+        mainnetHttpsUrl = vm.envString("MAINNET_HTTPS_URL");
+        mainnetFork = vm.createSelectFork(mainnetHttpsUrl, 15883016);
+        MarketParameters[] memory marketParameters = NotionalViews(notionalRouter).getActiveMarkets(currencyId);
+        uint threeMonthMaturity = marketParameters[0].maturity;
+        uint sixMonthMaturity = marketParameters[1].maturity;
+        uint oneYearMaturity = marketParameters[2].maturity;
+        IWrappedfCashComplete threeMonthfCash = IWrappedfCashComplete(
+            IWrappedfCashFactory(wrappedfCashFactory).deployWrapper(currencyId, uint40(threeMonthMaturity))
+        );
+        IWrappedfCashComplete sixMonthfCash = IWrappedfCashComplete(
+            IWrappedfCashFactory(wrappedfCashFactory).deployWrapper(currencyId, uint40(sixMonthMaturity))
+        );
+        IWrappedfCashComplete oneYearfCash = IWrappedfCashComplete(
+            IWrappedfCashFactory(wrappedfCashFactory).deployWrapper(currencyId, uint40(oneYearMaturity))
+        );
+
+        vm.startPrank(usdcWhale);
+        usdc.approve(address(threeMonthfCash), type(uint).max);
+        usdc.approve(address(sixMonthfCash), type(uint).max);
+        usdc.approve(address(oneYearfCash), type(uint).max);
+
+        uint usdcBalanceBefore = usdc.balanceOf(usdcWhale);
+
+        uint assets = 10_000 * 1e6;
+        threeMonthfCash.deposit(assets, usdcWhale);
+        sixMonthfCash.deposit(assets, usdcWhale);
+        oneYearfCash.deposit(assets, usdcWhale);
+
+        uint threeMonthfCashBalance = threeMonthfCash.balanceOf(usdcWhale);
+        uint sixMonthfCashBalance = sixMonthfCash.balanceOf(usdcWhale);
+        uint oneYearfCashBalance = oneYearfCash.balanceOf(usdcWhale);
+
+        console.log("threeMonthfCashBalance is: ", threeMonthfCashBalance); // 10_032 fCash
+        console.log("sixMonthfCashBalance is: ", sixMonthfCashBalance); // 10_110 fCash
+        console.log("oneYearfCashBalance is: ", oneYearfCashBalance); // 10_337 fCash
+
+        vm.warp(block.timestamp + 1 days);
+
+        threeMonthfCash.redeemToUnderlying(threeMonthfCashBalance, usdcWhale, type(uint32).max);
+        uint threeMonthRedeemBalanceDiff = usdcBalanceBefore - 2 * assets - usdc.balanceOf(usdcWhale);
+        uint threeMonthLoss = 7_814_382;
+        assertEq(threeMonthRedeemBalanceDiff, threeMonthLoss); // Lost $7
+
+        sixMonthfCash.redeemToUnderlying(sixMonthfCashBalance, usdcWhale, type(uint32).max);
+        uint sixMonthRedeemBalanceDiff = usdcBalanceBefore - assets - usdc.balanceOf(usdcWhale) - threeMonthLoss;
+        uint sixMonthLoss = 22_721_780;
+        assertEq(sixMonthRedeemBalanceDiff, sixMonthLoss); // Lost $22
+
+        oneYearfCash.redeemToUnderlying(oneYearfCashBalance, usdcWhale, type(uint32).max);
+        uint oneYearRedeemBalanceDiff = usdcBalanceBefore - usdc.balanceOf(usdcWhale) - threeMonthLoss - sixMonthLoss;
+        uint oneYearLoss = 52_966_032;
+        assertEq(oneYearRedeemBalanceDiff, oneYearLoss); // Lost $52
+
+        assertEq(usdcBalanceBefore - usdc.balanceOf(usdcWhale), threeMonthLoss + sixMonthLoss + oneYearLoss); // Altogether lost $82
         vm.stopPrank();
     }
 }

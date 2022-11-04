@@ -839,16 +839,16 @@ contract SavingsVaultTest is Test {
         address phutureMultisig = 0x6575A93aBdFf85e5A6b97c2DB2b83bCEbc3574eC;
         address phutureFeeRecipient = 0x237a4d2166Eb65cB3f9fabBe55ef2eb5ed56bdb9;
         IWrappedfCashComplete sixMonthfCash = IWrappedfCashComplete(0xd7e1fCeD1B09D85a5d6b5a232117F1f418e09F2F);
-        vm.createSelectFork(mainnetHttpsUrl, 15881807);
-        SavingsVault newImpl = new SavingsVault();
+        vm.createSelectFork(mainnetHttpsUrl, 15889688);
+        address newImpl = 0x4030de8f22f17822e325287CE3c8d97c36982b67;
         SavingsVault proxy = SavingsVault(0x6bAD6A9BcFdA3fd60Da6834aCe5F93B8cFed9598);
         vm.prank(phutureMultisig);
         proxy.upgradeTo(address(newImpl));
         uint balanceOfFeeRecipientBefore = proxy.balanceOf(phutureFeeRecipient);
 
-        assertEq(balanceOfFeeRecipientBefore, 251004791297449557897550); //251k USV is already in feeRecipient
+        assertEq(balanceOfFeeRecipientBefore, 251004840146581894660517); //251k USV is already in feeRecipient
         assertEq(proxy.AUM_SCALED_PER_SECONDS_RATE(), 1e27);
-        assertEq(usdc.balanceOf(address(proxy)), 0);
+        assertEq(usdc.balanceOf(address(proxy)), 1000000);
         assertEq(sixMonthfCash.balanceOf(address(proxy)), 25332613214499); // 253k usdc
 
         vm.startPrank(usdcWhale);
@@ -857,24 +857,24 @@ contract SavingsVaultTest is Test {
         uint amount = 100_000 * 1e6;
         usdc.approve(address(proxy), type(uint).max);
         proxy.deposit(amount, usdcWhale);
-        assertEq(usdc.balanceOf(address(proxy)), amount);
+        assertEq(usdc.balanceOf(address(proxy)), amount + 1e6);
         assertEq(proxy.balanceOf(phutureFeeRecipient), balanceOfFeeRecipientBefore);
 
         vm.warp(86400 * 15 + block.timestamp);
         proxy.harvest(amount);
 
-        assertEq(usdc.balanceOf(address(proxy)), 48);
-        assertEq(sixMonthfCash.balanceOf(address(proxy)), 35430137274499); //354k usdc
+        assertEq(usdc.balanceOf(address(proxy)), 1000024);
+        assertEq(sixMonthfCash.balanceOf(address(proxy)), 35429284694499); //354k usdc
 
         vm.warp(86400 * 15 + block.timestamp);
         proxy.withdraw(amount / 2, usdcWhale, usdcWhale);
-        assertEq(sixMonthfCash.balanceOf(address(proxy)), 30382487006464);
+        assertEq(sixMonthfCash.balanceOf(address(proxy)), 30382207924019);
         assertEq(usdc.balanceOf(address(proxy)), 0);
         assertEq(proxy.balanceOf(phutureFeeRecipient), balanceOfFeeRecipientBefore);
         // withdrawing half of the remaining half
         proxy.withdraw(amount / 4, usdcWhale, usdcWhale);
 
-        assertEq(sixMonthfCash.balanceOf(address(proxy)), 27858661870024);
+        assertEq(sixMonthfCash.balanceOf(address(proxy)), 27858619065791);
         assertEq(usdc.balanceOf(address(proxy)), 0);
         assertEq(proxy.balanceOf(phutureFeeRecipient), balanceOfFeeRecipientBefore);
 
@@ -883,10 +883,10 @@ contract SavingsVaultTest is Test {
         assertEq(proxy.balanceOf(usdcWhale), 0);
         assertEq(proxy.balanceOf(phutureFeeRecipient), balanceOfFeeRecipientBefore);
 
-        assertEq(sixMonthfCash.balanceOf(address(proxy)), 25314877023525);
+        assertEq(sixMonthfCash.balanceOf(address(proxy)), 25315052480233);
         assertEq(usdc.balanceOf(address(proxy)), 0);
 
-        assertEq(usdc.balanceOf(usdcWhale) - balanceBeforeDeposit, 97803697);
+        assertEq(usdc.balanceOf(usdcWhale) - balanceBeforeDeposit, 98987410);
 
         // Checking transfer of USV
         proxy.deposit(amount, usdcWhale);
