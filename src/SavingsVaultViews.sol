@@ -155,7 +155,7 @@ contract SavingsVaultViews is ISavingsVaultViews {
         for (uint i = 0; i < 2; i++) {
             IWrappedfCashComplete fCashPosition = IWrappedfCashComplete(fCashPositions[i]);
             if (fCashPosition.hasMatured()) {
-                uint fCashAmount = fCashPosition.balanceOf(address(this));
+                uint fCashAmount = fCashPosition.balanceOf(_savingsVault);
                 if (fCashAmount != 0) {
                     maxDepositedAmount += fCashPosition.previewRedeem(fCashAmount);
                 }

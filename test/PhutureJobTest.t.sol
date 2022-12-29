@@ -76,7 +76,7 @@ contract PhutureJobTest is Test {
         savingsVaultProxy.grantRole(keccak256("VAULT_MANAGER_ROLE"), msg.sender);
         savingsVaultProxy.grantRole(keccak256("VAULT_MANAGER_ROLE"), usdcWhale);
         phutureJob.grantRole(keccak256("JOB_MANAGER_ROLE"), msg.sender);
-        phutureJob.grantRole(keccak256("JOB_MANAGER_ROLE"), address(0xb4c79daB8f259C7Aee6E5b2Aa729821864227e84));
+        phutureJob.grantRole(keccak256("JOB_MANAGER_ROLE"), address(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496));
         phutureJob.grantRole(keccak256("JOB_MANAGER_ROLE"), usdcWhale);
         phutureJob.unpause();
     }

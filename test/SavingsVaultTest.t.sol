@@ -159,7 +159,7 @@ contract SavingsVaultTest is Test {
 
         vm.expectRevert(
             bytes(
-                "AccessControl: account 0xb4c79dab8f259c7aee6e5b2aa729821864227e84 is missing role 0xd1473398bb66596de5d1ea1fc8e303ff2ac23265adc9144b1b52065dc4f0934b"
+                "AccessControl: account 0x7fa9385be102ac3eac297483dd6233d62b3e1496 is missing role 0xd1473398bb66596de5d1ea1fc8e303ff2ac23265adc9144b1b52065dc4f0934b"
             )
         );
         SavingsVaultProxy.setMaxLoss(9500);
@@ -175,7 +175,7 @@ contract SavingsVaultTest is Test {
     function testCannotSetFeeRecipient() public {
         vm.expectRevert(
             bytes(
-                "AccessControl: account 0xb4c79dab8f259c7aee6e5b2aa729821864227e84 is missing role 0xd1473398bb66596de5d1ea1fc8e303ff2ac23265adc9144b1b52065dc4f0934b"
+                "AccessControl: account 0x7fa9385be102ac3eac297483dd6233d62b3e1496 is missing role 0xd1473398bb66596de5d1ea1fc8e303ff2ac23265adc9144b1b52065dc4f0934b"
             )
         );
         SavingsVaultProxy.setFeeRecipient(address(0xABCDE));
